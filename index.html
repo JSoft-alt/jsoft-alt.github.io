@@ -1,1 +1,411 @@
-sss
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shen Yun USA Tour Schedule 2025-2026</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Warm Neutrals (Slate, Zinc, Stone) -->
+    <!-- Application Structure Plan: A single-page dashboard design was chosen for optimal user experience. It presents all information in one view, avoiding clicks and page loads. The structure includes: 1) Key Performance Indicators (KPIs) at the top for a quick overview (total shows, states, venues). 2) A central control panel with state filters and a search bar for intuitive data exploration. 3) A main content area with a sortable, filterable table for detailed information, which is the most direct way to present tabular data. 4) A complementary bar chart visualizing shows per state, offering a graphical perspective. This structure allows users to seamlessly move from a high-level overview to detailed exploration, which is more user-friendly than a simple static table. -->
+    <!-- Visualization & Content Choices: 
+        - Report Info: Full performance schedule. Goal: Inform & Organize. Viz/Method: Interactive HTML Table. Interaction: Sort by column, filter by state, text search, and now click-to-view details. Justification: A table is the most effective way to display structured, multi-column data. Interactivity makes it powerful for large datasets. Method: Vanilla JS DOM manipulation.
+        - Report Info: Geographic distribution of shows. Goal: Compare. Viz/Method: Horizontal Bar Chart. Interaction: Tooltips on hover. Justification: A bar chart provides an immediate visual comparison of show volumes across different states, which is easier to grasp than scanning a table. Library: Chart.js (Canvas).
+        - Report Info: High-level summary. Goal: Inform. Viz/Method: KPI Cards. Interaction: None. Justification: Cards at the top provide immediate, scannable insights into the overall scale of the tour. Method: Styled HTML/Tailwind.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* slate-50 */
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 1200px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 500px;
+            max-height: 70vh;
+        }
+        th {
+            cursor: pointer;
+        }
+        th .sort-indicator {
+            display: inline-block;
+            margin-left: 5px;
+            opacity: 0.5;
+            transition: opacity 0.2s;
+        }
+        th:hover .sort-indicator {
+            opacity: 1;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 50px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <header class="bg-white shadow-sm">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">Shen Yun USA Tour</h1>
+            <p class="text-slate-500 mt-1">Interactive Schedule 2025-2026</p>
+        </div>
+    </header>
+
+    <main class="container mx-auto p-4 sm:p-6 lg:p-8">
+        
+        <section id="kpi-section" class="mb-8">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="bg-white p-6 rounded-lg shadow-sm text-center">
+                    <h3 class="text-4xl font-bold text-blue-600" id="total-shows">--</h3>
+                    <p class="text-slate-500 mt-1">Total Performances</p>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-sm text-center">
+                    <h3 class="text-4xl font-bold text-blue-600" id="total-venues">--</h3>
+                    <p class="text-slate-500 mt-1">Unique Venues</p>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-sm text-center">
+                    <h3 class="text-4xl font-bold text-blue-600" id="total-states">--</h3>
+                    <p class="text-slate-500 mt-1">States on Tour</p>
+                </div>
+                 <div class="bg-white p-6 rounded-lg shadow-sm text-center">
+                    <h3 class="text-4xl font-bold text-blue-600" id="avg-capacity">--</h3>
+                    <p class="text-slate-500 mt-1">Avg. Venue Capacity</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="controls-section" class="bg-white p-6 rounded-lg shadow-sm mb-8">
+             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                <div>
+                    <label for="search-input" class="block text-sm font-medium text-slate-700">Search by City or Theater</label>
+                    <input type="text" id="search-input" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" placeholder="e.g., New York or Lincoln Center">
+                </div>
+                <div>
+                    <label for="state-filter" class="block text-sm font-medium text-slate-700">Filter by State</label>
+                    <select id="state-filter" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                        <option value="all">All States</option>
+                    </select>
+                </div>
+            </div>
+        </section>
+
+        <section id="table-section" class="bg-white rounded-lg shadow-sm overflow-hidden">
+            <div class="p-6">
+                <h2 class="text-xl font-semibold text-slate-900">Performance Details</h2>
+                <p class="text-slate-500 mt-1">Click on a row for more details. Use the controls above to filter the schedule.</p>
+            </div>
+            <div id="loader" class="loader"></div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left text-slate-500">
+                    <thead class="text-xs text-slate-700 uppercase bg-slate-100">
+                        <tr>
+                            <th scope="col" class="px-6 py-3" data-sort="city">City/State <span class="sort-indicator">↕</span></th>
+                            <th scope="col" class="px-6 py-3" data-sort="theater">Theater Name <span class="sort-indicator">↕</span></th>
+                            <th scope="col" class="px-6 py-3" data-sort="startDate">Performance Dates <span class="sort-indicator">↕</span></th>
+                            <th scope="col" class="px-6 py-3" data-sort="capacity">Seating Capacity <span class="sort-indicator">↕</span></th>
+                        </tr>
+                    </thead>
+                    <tbody id="schedule-table-body">
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="chart-section" class="bg-white rounded-lg shadow-sm mt-8 p-6">
+            <h2 class="text-xl font-semibold text-slate-900 mb-2">Performances by State</h2>
+            <p class="text-slate-500 mb-4">This chart shows the total number of individual showtimes scheduled in each state, providing a visual overview of the tour's distribution across the country.</p>
+            <div class="chart-container">
+                <canvas id="shows-by-state-chart"></canvas>
+            </div>
+        </section>
+
+    </main>
+    
+    <div id="details-modal" class="fixed inset-0 bg-slate-900 bg-opacity-75 hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-lg shadow-2xl p-6 sm:p-8 max-w-lg w-full transform transition-all scale-100 opacity-100" id="modal-content-container">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl sm:text-2xl font-semibold text-slate-900" id="modal-title"></h3>
+                <button id="modal-close" class="text-slate-400 hover:text-slate-600 transition-colors duration-200" aria-label="Close modal">
+                    <span class="text-2xl">×</span>
+                </button>
+            </div>
+            <div id="modal-body" class="text-slate-700">
+                <p class="mb-2"><strong class="text-slate-800">Dates:</strong> <span id="modal-dates"></span></p>
+                <p class="mb-2"><strong class="text-slate-800">Seating Capacity:</strong> <span id="modal-capacity"></span></p>
+                <div class="mt-4">
+                    <h4 class="font-bold text-slate-800">Performance Times:</h4>
+                    <ul id="modal-times" class="list-disc list-inside mt-2 text-slate-600">
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-white mt-12 py-6 border-t border-slate-200">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8 text-center text-slate-500 text-sm">
+            <p>&copy; 2025 Interactive Schedule. Data compiled from publicly available sources for informational purposes.</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const performanceData = [
+                { theater: "San Jose Center for the Performing Arts", city: "San Jose", state: "CA", dates: "Dec 24–28, 2025", times: "Dec 24: 2:00 PM, Dec 26: 7:00 PM, Dec 27: 2:00 PM, 7:00 PM, Dec 28: 2:00 PM", capacity: 2677 },
+                { theater: "Jones Hall for the Performing Arts", city: "Houston", state: "TX", dates: "Dec 26–30, 2025", times: "Dec 26: 1:00 PM, Dec 27: 2:00 PM, 7:30 PM, Dec 28: 2:00 PM, 7:30 PM, Dec 29: 7:30 PM, Dec 30: 7:30 PM", capacity: 2912 },
+                { theater: "Palace Theater", city: "Waterbury", state: "CT", dates: "Dec 27, 2025", times: "Dec 27: 2:00 PM, 7:00 PM", capacity: 2900 },
+                { theater: "War Memorial Opera House", city: "San Francisco", state: "CA", dates: "Dec 31, 2025–Jan 4, 2026", times: "Dec 31: 2:00 PM, Jan 2: 7:00 PM, Jan 3: 2:00 PM, Jan 4: 2:00 PM", capacity: 3126 },
+                { theater: "Kravis Center for the Performing Arts", city: "West Palm Beach", state: "FL", dates: "Feb 2–3, 2026", times: "Feb 2: 7:30 PM, Feb 3: 7:30 PM", capacity: 2195 },
+                { theater: "W.L. Jack Howard Theatre", city: "Monroe", state: "LA", dates: "Feb 3, 2026", times: "Feb 3: 7:30 PM", capacity: 2200 },
+                { theater: "Youkey Theatre, RP Funding Center", city: "Lakeland", state: "FL", dates: "Feb 3–4, 2026", times: "Feb 3: 7:30 PM, Feb 4: 2:00 PM", capacity: 2286 },
+                { theater: "Duke Energy Center for the Arts – Mahaffey Theater", city: "St. Petersburg", state: "FL", dates: "Feb 6–8, 2026", times: "Feb 6: 7:30 PM, Feb 7: 2:00 PM, Feb 8: 2:00 PM", capacity: 2031 },
+                { theater: "Cannon Center for the Performing Arts", city: "Memphis", state: "TN", dates: "Feb 10, 2026", times: "Feb 10: 7:30 PM", capacity: 2050 },
+                { theater: "Thrasher-Horne Center", city: "Orange Park", state: "FL", dates: "Feb 10–11, 2026", times: "Feb 10: 7:30 PM, Feb 11: 7:30 PM", capacity: 1725 },
+                { theater: "Knoxville Civic Auditorium and Coliseum", city: "Knoxville", state: "TN", dates: "Feb 14–15, 2026", times: "Feb 14: 2:00 PM, Feb 15: 2:00 PM", capacity: 2500 },
+                { theater: "Broward Center for the Performing Arts – Au-Rene Theatre", city: "Fort Lauderdale", state: "FL", dates: "Feb 17–18, 2026", times: "Feb 17: 7:30 PM, Feb 18: 2:00 PM, 7:30 PM", capacity: 2688 },
+                { theater: "Belk Theater at Blumenthal Performing Arts Center", city: "Charlotte", state: "NC", dates: "Feb 20–22, 2026", times: "Feb 20: 7:30 PM, Feb 21: 2:00 PM, 7:30 PM, Feb 22: 2:00 PM", capacity: 2100 },
+                { theater: "McAllen Performing Arts Center", city: "McAllen", state: "TX", dates: "Feb 21–22, 2026", times: "Feb 21: 7:00 PM, Feb 22: 2:00 PM", capacity: 1800 },
+                { theater: "Steven Tanger Center for the Performing Arts", city: "Greensboro", state: "NC", dates: "Mar 4, 2026", times: "Mar 4: 7:30 PM", capacity: 3000 },
+                { theater: "Memorial Auditorium at Martin Marietta Center", city: "Raleigh", state: "NC", dates: "Mar 7–8, 2026", times: "Mar 7: 7:30 PM, Mar 8: 2:00 PM", capacity: 2277 },
+                { theater: "Koger Center for the Arts", city: "Columbia", state: "SC", dates: "Mar 10–11, 2026", times: "Mar 10: 7:30 PM, Mar 11: 7:30 PM", capacity: 2248 },
+                { theater: "Wagner Noël Performing Arts Center", city: "Midland", state: "TX", dates: "Mar 11, 2026", times: "Mar 11: 7:30 PM", capacity: 1811 },
+                { theater: "George S. and Dolores Doré Eccles Theater", city: "Salt Lake City", state: "UT", dates: "Mar 13–18, 2026", times: "Mar 13: 7:00 PM, Mar 14: 2:00 PM, Mar 15: 2:00 PM, Mar 17: 7:00 PM, Mar 18: 2:00 PM", capacity: 2468 },
+                { theater: "Adrienne Arsht Center for the Performing Arts", city: "Miami", state: "FL", dates: "Mar 13–15, 2026", times: "Mar 13: 7:30 PM, Mar 14: 2:00 PM, Mar 15: 2:00 PM", capacity: 2400 },
+                { theater: "The Plaza Theatre", city: "El Paso", state: "TX", dates: "Mar 14, 2026", times: "Mar 14: 7:30 PM", capacity: 2050 },
+                { theater: "RiverCenter for the Performing Arts", city: "Columbus", state: "GA", dates: "Mar 17, 2026", times: "Mar 17: 7:30 PM", capacity: 2000 },
+                { theater: "Montgomery Performing Arts Centre", city: "Montgomery", state: "AL", dates: "Mar 18, 2026", times: "Mar 18: 7:30 PM", capacity: 1750 },
+                { theater: "SAFE Credit Union Performing Arts Center", city: "Sacramento", state: "CA", dates: "Mar 26–29, 2026", times: "Mar 26: 7:00 PM, Mar 27: 2:00 PM, Mar 28: 2:00 PM, 7:00 PM, Mar 29: 1:00 PM", capacity: 2392 },
+                { theater: "The David H. Koch Theater at Lincoln Center", city: "New York", state: "NY", dates: "Mar 25–Apr 12, 2026", times: "Mar 25: 7:00 PM, Mar 26: 2:00 PM, Mar 27: 7:00 PM, Mar 28: 1:00 PM, 6:00 PM, Mar 29: 1:00 PM, Apr 1: 2:00 PM, Apr 2: 2:00 PM, Apr 3: 7:00 PM, Apr 4: 1:00 PM, 6:00 PM, Apr 5: 1:00 PM, Apr 8: 2:00 PM, Apr 9: 2:00 PM, Apr 10: 7:00 PM, Apr 11: 1:00 PM, 6:00 PM, Apr 12: 1:00 PM", capacity: 2586 },
+                { theater: "Marion Oliver McCaw Hall", city: "Seattle", state: "WA", dates: "Apr 1–5, 2026", times: "Apr 1: 7:00 PM, Apr 2: 2:00 PM, Apr 3: 7:00 PM, Apr 4: 2:00 PM, 7:00 PM, Apr 5: 2:00 PM", capacity: 2896 },
+                { theater: "Pikes Peak Center for the Performing Arts", city: "Colorado Springs", state: "CO", dates: "Apr 3–5, 2026", times: "Apr 3: 7:00 PM, Apr 4: 2:00 PM, Apr 5: 2:00 PM", capacity: 2030 },
+                { theater: "The Buell Theatre", city: "Denver", state: "CO", dates: "Apr 8–12, 2026", times: "Apr 8: 2:00 PM, Apr 9: 7:00 PM, Apr 10: 7:00 PM, Apr 11: 2:00 PM, Apr 12: 2:00 PM", capacity: 2839 },
+                { theater: "Boch Center Wang Theatre", city: "Boston", state: "MA", dates: "Apr 10–12, 2026", times: "Apr 10: 1:30 PM, Apr 11: 1:30 PM, 7:00 PM, Apr 12: 1:30 PM", capacity: 3500 },
+                { theater: "The Hippodrome Theatre", city: "Baltimore", state: "MD", dates: "Apr 18–19, 2026", times: "Apr 18: 2:00 PM, 7:30 PM, Apr 19: 2:00 PM", capacity: 2284 },
+                { theater: "Chrysler Hall", city: "Norfolk", state: "VA", dates: "Apr 22–23, 2026", times: "Apr 22: 7:30 PM, Apr 23: 1:00 PM", capacity: 2500 },
+                { theater: "The Hanover Theatre", city: "Worcester", state: "MA", dates: "Apr 25–26, 2026", times: "Apr 25: 1:30 PM, 7:00 PM, Apr 26: 1:30 PM", capacity: 2300 },
+                { theater: "New Jersey Performing Arts Center", city: "Newark", state: "NJ", dates: "Apr 29–May 3, 2026", times: "Apr 29: 2:00 PM, Apr 30: 2:00 PM, May 1: 7:00 PM, May 2: 1:00 PM, 6:00 PM, May 3: 1:00 PM", capacity: 2868 }
+            ];
+
+            const tableBody = document.getElementById('schedule-table-body');
+            const searchInput = document.getElementById('search-input');
+            const stateFilter = document.getElementById('state-filter');
+            const loader = document.getElementById('loader');
+
+            const modal = document.getElementById('details-modal');
+            const modalTitle = document.getElementById('modal-title');
+            const modalDates = document.getElementById('modal-dates');
+            const modalCapacity = document.getElementById('modal-capacity');
+            const modalTimes = document.getElementById('modal-times');
+            const modalCloseBtn = document.getElementById('modal-close');
+
+            let currentSort = { column: 'startDate', order: 'asc' };
+            let chartInstance = null;
+            
+            function parseDate(dateStr) {
+                const monthDay = dateStr.split(' ')[0] + " " + dateStr.split(' ')[1].match(/\d+/)[0];
+                let year = dateStr.includes('2025') ? 2025 : 2026;
+                if (dateStr.toLowerCase().includes('dec')) {
+                    year = 2025;
+                }
+                return new Date(`${monthDay}, ${year}`);
+            }
+
+            const processedData = performanceData.map(d => ({
+                ...d,
+                startDate: parseDate(d.dates),
+                showCount: (d.times.match(/PM|AM/g) || []).length
+            }));
+            
+            function sortData(data, column, order) {
+                return [...data].sort((a, b) => {
+                    let valA = a[column];
+                    let valB = b[column];
+                    let comparison = 0;
+                    if (valA > valB) {
+                        comparison = 1;
+                    } else if (valA < valB) {
+                        comparison = -1;
+                    }
+                    return order === 'asc' ? comparison : -comparison;
+                });
+            }
+
+            function showModal(item) {
+                modalTitle.textContent = `${item.theater}`;
+                modalDates.textContent = item.dates;
+                modalCapacity.textContent = item.capacity.toLocaleString();
+                modalTimes.innerHTML = '';
+                item.times.split(', ').forEach(time => {
+                    const li = document.createElement('li');
+                    li.textContent = time.trim();
+                    modalTimes.appendChild(li);
+                });
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+
+            function closeModal() {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+
+            function renderTable(data) {
+                tableBody.innerHTML = '';
+                if (data.length === 0) {
+                    tableBody.innerHTML = `<tr><td colspan="4" class="text-center py-10 px-6">No performances found matching your criteria.</td></tr>`;
+                    return;
+                }
+                data.forEach(item => {
+                    const row = document.createElement('tr');
+                    row.className = 'bg-white border-b hover:bg-slate-50 cursor-pointer';
+                    row.innerHTML = `
+                        <td class="px-6 py-4 font-medium text-slate-900">${item.city}, ${item.state}</td>
+                        <td class="px-6 py-4">${item.theater}</td>
+                        <td class="px-6 py-4">${item.dates}</td>
+                        <td class="px-6 py-4">${item.capacity.toLocaleString()}</td>
+                    `;
+                    row.addEventListener('click', () => showModal(item));
+                    tableBody.appendChild(row);
+                });
+            }
+
+            function updateKPIs(data) {
+                const totalShows = data.reduce((sum, item) => sum + item.showCount, 0);
+                document.getElementById('total-shows').textContent = totalShows;
+                document.getElementById('total-venues').textContent = new Set(data.map(d => d.theater)).size;
+                document.getElementById('total-states').textContent = new Set(data.map(d => d.state)).size;
+                const avgCapacity = data.reduce((sum, item) => sum + item.capacity, 0) / data.length;
+                document.getElementById('avg-capacity').textContent = Math.round(avgCapacity).toLocaleString();
+            }
+
+            function populateStateFilter() {
+                const states = [...new Set(processedData.map(item => item.state))].sort();
+                states.forEach(state => {
+                    const option = document.createElement('option');
+                    option.value = state;
+                    option.textContent = state;
+                    stateFilter.appendChild(option);
+                });
+            }
+
+            function filterAndRender() {
+                const searchTerm = searchInput.value.toLowerCase();
+                const selectedState = stateFilter.value;
+
+                let filteredData = processedData;
+
+                if (selectedState !== 'all') {
+                    filteredData = filteredData.filter(item => item.state === selectedState);
+                }
+
+                if (searchTerm) {
+                    filteredData = filteredData.filter(item => 
+                        item.city.toLowerCase().includes(searchTerm) || 
+                        item.theater.toLowerCase().includes(searchTerm)
+                    );
+                }
+                
+                const sortedData = sortData(filteredData, currentSort.column, currentSort.order);
+                renderTable(sortedData);
+            }
+
+            function renderChart() {
+                const showsByState = processedData.reduce((acc, curr) => {
+                    acc[curr.state] = (acc[curr.state] || 0) + curr.showCount;
+                    return acc;
+                }, {});
+
+                const sortedStates = Object.entries(showsByState).sort(([, a], [, b]) => b - a);
+
+                const chartLabels = sortedStates.map(item => item[0]);
+                const chartData = sortedStates.map(item => item[1]);
+
+                const ctx = document.getElementById('shows-by-state-chart').getContext('2d');
+                if (chartInstance) {
+                    chartInstance.destroy();
+                }
+                chartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: chartLabels,
+                        datasets: [{
+                            label: '# of Performances',
+                            data: chartData,
+                            backgroundColor: 'rgba(59, 130, 246, 0.5)',
+                            borderColor: 'rgba(59, 130, 246, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Number of Performances'
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return ` ${context.raw} performances`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            document.querySelectorAll('th[data-sort]').forEach(th => {
+                th.addEventListener('click', () => {
+                    const column = th.dataset.sort;
+                    const order = (currentSort.column === column && currentSort.order === 'asc') ? 'desc' : 'asc';
+                    currentSort = { column, order };
+                    filterAndRender();
+                });
+            });
+
+            searchInput.addEventListener('input', filterAndRender);
+            stateFilter.addEventListener('change', filterAndRender);
+            modalCloseBtn.addEventListener('click', closeModal);
+            modal.addEventListener('click', (e) => {
+                if (e.target.id === 'details-modal') {
+                    closeModal();
+                }
+            });
+
+            setTimeout(() => {
+                loader.style.display = 'none';
+                document.querySelector('#table-section .overflow-x-auto').style.display = 'block';
+                
+                updateKPIs(processedData);
+                populateStateFilter();
+                filterAndRender();
+                renderChart();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
