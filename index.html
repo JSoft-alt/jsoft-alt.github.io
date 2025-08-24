@@ -7,14 +7,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Chosen Palette: Warm Neutrals (Slate, Zinc, Stone) -->
-    <!-- Application Structure Plan: A single-page dashboard design was chosen for optimal user experience. It presents all information in one view, avoiding clicks and page loads. The structure includes: 1) Key Performance Indicators (KPIs) at the top for a quick overview (total shows, states, venues). 2) A central control panel with state filters and a search bar for intuitive data exploration. 3) A main content area with a sortable, filterable table for detailed information, which is the most direct way to present tabular data. 4) A complementary bar chart visualizing shows per state, offering a graphical perspective. This structure allows users to seamlessly move from a high-level overview to detailed exploration, which is more user-friendly than a simple static table. -->
-    <!-- Visualization & Content Choices: 
-        - Report Info: Full performance schedule. Goal: Inform & Organize. Viz/Method: Interactive HTML Table. Interaction: Sort by column, filter by state, text search, and now click-to-view details. Justification: A table is the most effective way to display structured, multi-column data. Interactivity makes it powerful for large datasets. Method: Vanilla JS DOM manipulation.
-        - Report Info: Geographic distribution of shows. Goal: Compare. Viz/Method: Horizontal Bar Chart. Interaction: Tooltips on hover. Justification: A bar chart provides an immediate visual comparison of show volumes across different states, which is easier to grasp than scanning a table. Library: Chart.js (Canvas).
-        - Report Info: High-level summary. Goal: Inform. Viz/Method: KPI Cards. Interaction: None. Justification: Cards at the top provide immediate, scannable insights into the overall scale of the tour. Method: Styled HTML/Tailwind.
-    -->
-    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -57,21 +49,32 @@
         .text-nowrap {
             white-space: nowrap;
         }
+        .modal-body-content {
+            white-space: pre-wrap;
+        }
     </style>
 </head>
 <body class="text-slate-800">
 
     <header class="bg-white shadow-sm">
-        <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center">
             <div>
                 <h1 class="text-2xl sm:text-3xl font-bold text-slate-900" data-i18n="headerTitle">Shen Yun USA Tour</h1>
                 <p class="text-slate-500 mt-1" data-i18n="headerSubtitle">Interactive Schedule 2025-2026</p>
             </div>
-            <div class="relative">
-                <select id="language-switcher" class="block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
-                    <option value="en">English</option>
-                    <option value="zh">中文</option>
-                </select>
+            <div class="flex items-center space-x-4 mt-4 sm:mt-0">
+                <div class="relative">
+                    <select id="language-switcher" class="block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                        <option value="en">English</option>
+                        <option value="zh">中文</option>
+                    </select>
+                </div>
+                <button id="editing-login-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-md shadow-sm transition-colors duration-200">
+                    Enable Editing
+                </button>
+                <button id="editing-logout-btn" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-md shadow-sm transition-colors duration-200 hidden">
+                    Logout
+                </button>
             </div>
         </div>
     </header>
@@ -96,6 +99,17 @@
                     <h3 class="text-4xl font-bold text-blue-600" id="avg-capacity">--</h3>
                     <p class="text-slate-500 mt-1" data-i18n="avgCapacity">Avg. Venue Capacity</p>
                 </div>
+            </div>
+        </section>
+
+        <section id="editing-section" class="bg-yellow-50 border border-yellow-200 p-6 rounded-lg shadow-sm mb-8 hidden">
+            <h2 class="text-xl font-semibold text-yellow-800 mb-2">Editing Mode</h2>
+            <p class="text-yellow-700 mb-4">Paste the full JSON array of performance data below and click update. Be careful, this will replace the current schedule!</p>
+            <textarea id="edit-textarea" class="w-full h-64 p-3 rounded-md border border-yellow-300 focus:ring-yellow-500 focus:border-yellow-500 text-sm text-yellow-900 bg-yellow-100" placeholder="Paste JSON data here..."></textarea>
+            <div class="mt-4 flex justify-end space-x-3">
+                <button id="update-schedule-btn" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md shadow-sm transition-colors duration-200">
+                    Update Schedule
+                </button>
             </div>
         </section>
 
@@ -146,11 +160,12 @@
 
     </main>
     
+    <!-- Modal for Performance Details -->
     <div id="details-modal" class="fixed inset-0 bg-slate-900 bg-opacity-75 hidden flex items-center justify-center p-4 z-50">
         <div class="bg-white rounded-lg shadow-2xl p-6 sm:p-8 max-w-lg w-full transform transition-all scale-100 opacity-100" id="modal-content-container">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="text-xl sm:text-2xl font-semibold text-slate-900" id="modal-title"></h3>
-                <button id="modal-close" class="text-slate-400 hover:text-slate-600 transition-colors duration-200" aria-label="Close modal">
+                <button id="details-modal-close" class="text-slate-400 hover:text-slate-600 transition-colors duration-200" aria-label="Close modal">
                     <span class="text-2xl">×</span>
                 </button>
             </div>
@@ -160,56 +175,97 @@
                 <p class="mb-2"><strong class="text-slate-800" data-i18n="modalCapacity">Seating Capacity:</strong> <span id="modal-capacity"></span></p>
                 <div class="mt-4">
                     <h4 class="font-bold text-slate-800" data-i18n="modalTimesHeader">Performance Times:</h4>
-                    <!-- Display performance times with a new line for each date and a comma for same-day times -->
-                    <p id="modal-times" class="mt-2 text-slate-600 whitespace-pre-line"></p>
+                    <pre id="modal-times" class="mt-2 text-slate-600 whitespace-pre-line modal-body-content"></pre>
                 </div>
             </div>
         </div>
     </div>
+    
+    <!-- Modal for Login/Messages -->
+    <div id="message-modal" class="fixed inset-0 bg-slate-900 bg-opacity-75 hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-lg shadow-2xl p-6 sm:p-8 max-w-md w-full" id="message-modal-content">
+            <h3 class="text-xl font-semibold text-slate-900 mb-4" id="message-modal-title"></h3>
+            <p id="message-modal-text" class="text-slate-700 mb-6"></p>
+            <div id="login-inputs" class="space-y-4 hidden">
+                <div>
+                    <label for="username" class="block text-sm font-medium text-slate-700">Username</label>
+                    <input type="text" id="username" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                </div>
+                <div>
+                    <label for="password" class="block text-sm font-medium text-slate-700">Password</label>
+                    <input type="password" id="password" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                </div>
+            </div>
+            <div class="flex justify-end space-x-3">
+                <button id="message-modal-close" class="bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold py-2 px-4 rounded-md shadow-sm transition-colors duration-200">
+                    Close
+                </button>
+                <button id="message-modal-confirm" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-md shadow-sm transition-colors duration-200 hidden">
+                    Login
+                </button>
+            </div>
+        </div>
+    </div>
+
 
     <footer class="bg-white mt-12 py-6 border-t border-slate-200">
         <div class="container mx-auto px-4 sm:px-6 lg:px-8 text-center text-slate-500 text-sm">
-            <p data-i18n="footerText">&copy; 2025 Interactive Schedule. Data compiled from publicly available sources for informational purposes.</p>
+            <p data-i18n="footerText">Data compiled from publicly available sources for informational purposes.</p>
         </div>
     </footer>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            const performanceData = [
-                { theater: "San Jose Center for the Performing Arts", city: "San Jose", state: "CA", address: "255 S Almaden Blvd, San Jose, CA 95113", dates: "Dec 24–28, 2025", times: "Dec 24: 2:00 PM, Dec 26: 7:00 PM, Dec 27: 2:00 PM, 7:00 PM, Dec 28: 2:00 PM", capacity: 2677 },
-                { theater: "Jones Hall for the Performing Arts", city: "Houston", state: "TX", address: "615 Louisiana St, Houston, TX 77002", dates: "Dec 26–30, 2025", times: "Dec 26: 1:00 PM, Dec 27: 2:00 PM, 7:30 PM, Dec 28: 2:00 PM, 7:30 PM, Dec 29: 7:30 PM, Dec 30: 7:30 PM", capacity: 2912 },
-                { theater: "Palace Theater", city: "Waterbury", state: "CT", address: "100 E Main St, Waterbury, CT 06702", dates: "Dec 27, 2025", times: "Dec 27: 2:00 PM, 7:00 PM", capacity: 2900 },
-                { theater: "War Memorial Opera House", city: "San Francisco", state: "CA", address: "301 Van Ness Ave, San Francisco, CA 94102", dates: "Dec 31, 2025–Jan 4, 2026", times: "Dec 31: 2:00 PM, Jan 2: 7:00 PM, Jan 3: 2:00 PM, Jan 4: 2:00 PM", capacity: 3126 },
-                { theater: "Kravis Center for the Performing Arts", city: "West Palm Beach", state: "FL", address: "701 Okeechobee Blvd, West Palm Beach, FL 33401", dates: "Feb 2–3, 2026", times: "Feb 2: 7:30 PM, Feb 3: 7:30 PM", capacity: 2195 },
-                { theater: "W.L. Jack Howard Theatre", city: "Monroe", state: "LA", address: "401 Lea Joyner Expy, Monroe, LA 71201", dates: "Feb 3, 2026", times: "Feb 3: 7:30 PM", capacity: 2200 },
-                { theater: "Youkey Theatre, RP Funding Center", city: "Lakeland", state: "FL", address: "701 W Lime St, Lakeland, FL 33815", dates: "Feb 3–4, 2026", times: "Feb 3: 7:30 PM, Feb 4: 2:00 PM", capacity: 2286 },
-                { theater: "Duke Energy Center for the Arts – Mahaffey Theater", city: "St. Petersburg", state: "FL", address: "400 1st St S, St. Petersburg, FL 33701", dates: "Feb 6–8, 2026", times: "Feb 6: 7:30 PM, Feb 7: 2:00 PM, Feb 8: 2:00 PM", capacity: 2031 },
-                { theater: "Cannon Center for the Performing Arts", city: "Memphis", state: "TN", address: "255 N Main St, Memphis, TN 38103", dates: "Feb 10, 2026", times: "Feb 10: 7:30 PM", capacity: 2050 },
-                { theater: "Thrasher-Horne Center", city: "Orange Park", state: "FL", address: "283 College Dr, Orange Park, FL 32065", dates: "Feb 10–11, 2026", times: "Feb 10: 7:30 PM, Feb 11: 7:30 PM", capacity: 1725 },
-                { theater: "Knoxville Civic Auditorium and Coliseum", city: "Knoxville", state: "TN", address: "500 Howard Baker Jr Ave, Knoxville, TN 37915", dates: "Feb 14–15, 2026", times: "Feb 14: 2:00 PM, Feb 15: 2:00 PM", capacity: 2500 },
-                { theater: "Broward Center for the Performing Arts – Au-Rene Theatre", city: "Fort Lauderdale", state: "FL", address: "201 SW 5th Ave, Fort Lauderdale, FL 33312", dates: "Feb 17–18, 2026", times: "Feb 17: 7:30 PM, Feb 18: 2:00 PM, 7:30 PM", capacity: 2688 },
-                { theater: "Belk Theater at Blumenthal Performing Arts Center", city: "Charlotte", state: "NC", address: "130 N Tryon St, Charlotte, NC 28202", dates: "Feb 20–22, 2026", times: "Feb 20: 7:30 PM, Feb 21: 2:00 PM, 7:30 PM, Feb 22: 2:00 PM", capacity: 2100 },
-                { theater: "McAllen Performing Arts Center", city: "McAllen", state: "TX", address: "801 Convention Center Blvd, McAllen, TX 78501", dates: "Feb 21–22, 2026", times: "Feb 21: 7:00 PM, Feb 22: 2:00 PM", capacity: 1800 },
-                { theater: "Steven Tanger Center for the Performing Arts", city: "Greensboro", state: "NC", address: "300 N Elm St, Greensboro, NC 27401", dates: "Mar 4, 2026", times: "Mar 4: 7:30 PM", capacity: 3000 },
-                { theater: "Memorial Auditorium at Martin Marietta Center", city: "Raleigh", state: "NC", address: "2 E South St, Raleigh, NC 27601", dates: "Mar 7–8, 2026", times: "Mar 7: 7:30 PM, Mar 8: 2:00 PM", capacity: 2277 },
-                { theater: "Koger Center for the Arts", city: "Columbia", state: "SC", address: "1051 Greene St, Columbia, SC 29201", dates: "Mar 10–11, 2026", times: "Mar 10: 7:30 PM, Mar 11: 7:30 PM", capacity: 2248 },
-                { theater: "Wagner Noël Performing Arts Center", city: "Midland", state: "TX", address: "1559 N FM 1788, Midland, TX 79707", dates: "Mar 11, 2026", times: "Mar 11: 7:30 PM", capacity: 1811 },
-                { theater: "George S. and Dolores Doré Eccles Theater", city: "Salt Lake City", state: "UT", address: "131 S Main St, Salt Lake City, UT 84111", dates: "Mar 13–18, 2026", times: "Mar 13: 7:00 PM, Mar 14: 2:00 PM, Mar 15: 2:00 PM, Mar 17: 7:00 PM, Mar 18: 2:00 PM", capacity: 2468 },
-                { theater: "Adrienne Arsht Center for the Performing Arts", city: "Miami", state: "FL", address: "1300 Biscayne Blvd, Miami, FL 33132", dates: "Mar 13–15, 2026", times: "Mar 13: 7:30 PM, Mar 14: 2:00 PM, Mar 15: 2:00 PM", capacity: 2400 },
-                { theater: "The Plaza Theatre", city: "El Paso", state: "TX", address: "125 Pioneer Plaza, El Paso, TX 79901", dates: "Mar 14, 2026", times: "Mar 14: 7:30 PM", capacity: 2050 },
-                { theater: "RiverCenter for the Performing Arts", city: "Columbus", state: "GA", address: "900 Broadway, Columbus, GA 31901", dates: "Mar 17, 2026", times: "Mar 17: 7:30 PM", capacity: 2000 },
-                { theater: "Montgomery Performing Arts Centre", city: "Montgomery", state: "AL", address: "201 Tallapoosa St, Montgomery, AL 36104", dates: "Mar 18, 2026", times: "Mar 18: 7:30 PM", capacity: 1750 },
-                { theater: "SAFE Credit Union Performing Arts Center", city: "Sacramento", state: "CA", address: "1301 L St, Sacramento, CA 95814", dates: "Mar 26–29, 2026", times: "Mar 26: 7:00 PM, Mar 27: 2:00 PM, Mar 28: 2:00 PM, 7:00 PM, Mar 29: 1:00 PM", capacity: 2392 },
-                { theater: "The David H. Koch Theater at Lincoln Center", city: "New York", state: "NY", address: "20 Lincoln Center Plaza, New York, NY 10023", dates: "Mar 25–Apr 12, 2026", times: "Mar 25: 7:00 PM, Mar 26: 2:00 PM, Mar 27: 7:00 PM, Mar 28: 1:00 PM, 6:00 PM, Mar 29: 1:00 PM, Apr 1: 2:00 PM, Apr 2: 2:00 PM, Apr 3: 7:00 PM, Apr 4: 1:00 PM, 6:00 PM, Apr 5: 1:00 PM, Apr 8: 2:00 PM, Apr 9: 2:00 PM, Apr 10: 7:00 PM, Apr 11: 1:00 PM, 6:00 PM, Apr 12: 1:00 PM", capacity: 2586 },
-                { theater: "Marion Oliver McCaw Hall", city: "Seattle", state: "WA", address: "321 Mercer St, Seattle, WA 98109", dates: "Apr 1–5, 2026", times: "Apr 1: 7:00 PM, Apr 2: 2:00 PM, Apr 3: 7:00 PM, Apr 4: 2:00 PM, 7:00 PM, Apr 5: 2:00 PM", capacity: 2896 },
-                { theater: "Pikes Peak Center for the Performing Arts", city: "Colorado Springs", state: "CO", address: "190 S Cascade Ave, Colorado Springs, CO 80903", dates: "Apr 3–5, 2026", times: "Apr 3: 7:00 PM, Apr 4: 2:00 PM, Apr 5: 2:00 PM", capacity: 2030 },
-                { theater: "The Buell Theatre", city: "Denver", state: "CO", address: "1350 Curtis St, Denver, CO 80204", dates: "Apr 8–12, 2026", times: "Apr 8: 2:00 PM, Apr 9: 7:00 PM, Apr 10: 7:00 PM, Apr 11: 2:00 PM, Apr 12: 2:00 PM", capacity: 2839 },
-                { theater: "Boch Center Wang Theatre", city: "Boston", state: "MA", address: "270 Tremont St, Boston, MA 02116", dates: "Apr 10–12, 2026", times: "Apr 10: 1:30 PM, Apr 11: 1:30 PM, 7:00 PM, Apr 12: 1:30 PM", capacity: 3500 },
-                { theater: "The Hippodrome Theatre", city: "Baltimore", state: "MD", address: "12 N Eutaw St, Baltimore, MD 21201", dates: "Apr 18–19, 2026", times: "Apr 18: 2:00 PM, 7:30 PM, Apr 19: 2:00 PM", capacity: 2284 },
-                { theater: "Chrysler Hall", city: "Norfolk", state: "VA", address: "215 St Pauls Blvd, Norfolk, VA 23510", dates: "Apr 22–23, 2026", times: "Apr 22: 7:30 PM, Apr 23: 1:00 PM", capacity: 2500 },
-                { theater: "The Hanover Theatre", city: "Worcester", state: "MA", address: "2 Southbridge St, Worcester, MA 01608", dates: "Apr 25–26, 2026", times: "Apr 25: 1:30 PM, 7:00 PM, Apr 26: 1:30 PM", capacity: 2300 },
-                { theater: "New Jersey Performing Arts Center", city: "Newark", state: "NJ", address: "1 Center St, Newark, NJ 07102", dates: "Apr 29–May 3, 2026", times: "Apr 29: 2:00 PM, Apr 30: 2:00 PM, May 1: 7:00 PM, May 2: 1:00 PM, 6:00 PM, May 3: 1:00 PM", capacity: 2868 }
+            let performanceData = [
+                { theater: "San Jose Center for the Performing Arts", city: "San Jose", state: "CA", address: "255 S Almaden Blvd, San Jose, CA 95113", dates: "Dec 24–28, 2025", showtimes: [{ date: "Dec 24", times: ["2:00 PM"] }, { date: "Dec 26", times: ["7:00 PM"] }, { date: "Dec 27", times: ["2:00 PM", "7:00 PM"] }, { date: "Dec 28", times: ["2:00 PM"] }], capacity: 2677 },
+                { theater: "Jones Hall for the Performing Arts", city: "Houston-Downtown", state: "TX", address: "615 Louisiana St, Houston, TX 77002", dates: "Dec 26–30, 2025", showtimes: [{ date: "Dec 26", times: ["7:00 PM"] }, { date: "Dec 27", times: ["2:00 PM", "7:00 PM"] }, { date: "Dec 28", times: ["2:00 PM", "7:30 PM"] }, { date: "Dec 29", times: ["7:30 PM"] }, { date: "Dec 30", times: ["7:30 PM"] }], capacity: 2912 },
+                { theater: "Palace Theater", city: "Waterbury", state: "CT", address: "100 E Main St, Waterbury, CT 06702", dates: "Dec 27, 2025", showtimes: [{ date: "Dec 27", times: ["2:00 PM", "7:00 PM"] }], capacity: 2900 },
+                { theater: "Jacksonville Center for the Performing Arts", city: "Jacksonville", state: "FL", address: "300 West Water Street, Jacksonville, FL 32202", dates: "Dec 27–28, 2025", showtimes: [{ date: "Dec 27", times: ["2:00 PM", "7:30 PM"] }, { date: "Dec 28", times: ["2:00 PM"] }], capacity: 3000 },
+                { theater: "Johnny Mercer Theatre", city: "Savannah", state: "GA", address: "301 W Oglethorpe Ave, Savannah, GA 31401", dates: "Dec 30, 2025", showtimes: [{ date: "Dec 30", times: ["7:30 PM"] }], capacity: 2522 },
+                { theater: "War Memorial Opera House", city: "San Francisco", state: "CA", address: "301 Van Ness Ave, San Francisco, CA 94102", dates: "Dec 31, 2025–Jan 4, 2026", showtimes: [{ date: "Dec 31", times: ["2:00 PM"] }, { date: "Jan 2", times: ["7:00 PM"] }, { date: "Jan 3", times: ["2:00 PM", "7:00 PM"] }, { date: "Jan 4", times: ["2:00 PM"] }], capacity: 3126 },
+                { theater: "Dell Hall at The Long Center", city: "Austin", state: "TX", address: "701 W Riverside Dr, Austin, TX 78704", dates: "Jan 2–4, 2026", showtimes: [{ date: "Jan 2", times: ["7:30 PM"] }, { date: "Jan 3", times: ["2:00 PM", "7:30 PM"] }, { date: "Jan 4", times: ["2:00 PM"] }], capacity: 2400 },
+                { theater: "The Majestic Theatre", city: "Dallas", state: "TX", address: "1925 Elm St, Dallas, TX 75201", dates: "Jan 3–25, 2026", showtimes: [{ date: "Jan 3", times: ["7:30 PM"] }, { date: "Jan 4", times: ["2:00 PM", "7:30 PM"] }, { date: "Jan 5-18", times: ["7:30 PM (weekdays)", "2:00 PM, 7:30 PM (weekends)"] }, { date: "Jan 19-25", times: ["7:30 PM (weekdays)", "2:00 PM, 7:30 PM (weekends)"] }], capacity: 1703 },
+                { theater: "Buddy Holly Hall of Performing Arts and Sciences", city: "Lubbock", state: "TX", address: "1300 Mac Davis Ln, Lubbock, TX 79401", dates: "Jan 6, 2026", showtimes: [{ date: "Jan 6", times: ["7:30 PM"] }], capacity: 2300 },
+                { theater: "The Kennedy Center Opera House", city: "Washington", state: "D.C.", address: "2700 F St NW, Washington, DC 20566", dates: "Jan 7–18, 2026", showtimes: [{ date: "Jan 7-18", times: ["7:00 PM (weekdays)", "2:00 PM, 7:00 PM (weekends)"] }], capacity: 2200 },
+                { theater: "The Tobin Center for the Performing Arts", city: "San Antonio", state: "TX", address: "100 Auditorium Cir, San Antonio, TX 78205", dates: "Jan 9–25, 2026", showtimes: [{ date: "Jan 9-25", times: ["7:30 PM (weekdays)", "2:00 PM, 7:30 PM (weekends)"] }], capacity: 1738 },
+                { theater: "The Soraya", city: "Northridge", state: "CA", address: "18111 Nordhoff St, Northridge, CA 91330", dates: "Jan 15–18, 2026", showtimes: [{ date: "Jan 15", times: ["7:30 PM"] }, { date: "Jan 16", times: ["7:30 PM"] }, { date: "Jan 17", times: ["2:00 PM", "7:30 PM"] }, { date: "Jan 18", times: ["2:00 PM"] }], capacity: 1700 },
+                { theater: "Popejoy Hall", city: "Albuquerque", state: "NM", address: "203 Cornell Dr NE, Albuquerque, NM 87106", dates: "Jan 27–28, 2026", showtimes: [{ date: "Jan 27", times: ["7:30 PM"] }, { date: "Jan 28", times: ["7:30 PM"] }], capacity: 1985 },
+                { theater: "Cobb Energy Performing Arts Centre", city: "Atlanta", state: "GA", address: "2800 Cobb Galleria Pkwy, Atlanta, GA 30339", dates: "Jan 27–Feb 1, 2026", showtimes: [{ date: "Jan 27", times: ["7:30 PM"] }, { date: "Jan 28", times: ["7:30 PM"] }, { date: "Jan 29", times: ["7:30 PM"] }, { date: "Jan 30", times: ["7:30 PM"] }, { date: "Jan 31", times: ["2:00 PM", "7:30 PM"] }, { date: "Feb 1", times: ["2:00 PM"] }], capacity: 2750 },
+                { theater: "Fred Kavli Theatre", city: "Thousand Oaks", state: "CA", address: "2100 E Thousand Oaks Blvd, Thousand Oaks, CA 91362", dates: "Jan 30–Feb 1, 2026", showtimes: [{ date: "Jan 30", times: ["7:30 PM"] }, { date: "Jan 31", times: ["2:00 PM", "7:30 PM"] }, { date: "Feb 1", times: ["2:00 PM"] }], capacity: 1800 },
+                { theater: "Cypress Creek FACE", city: "Houston-Cypress", state: "TX", address: "6823 Cypresswood Dr, Spring, TX 77379", dates: "Jan 30–Feb 15, 2026", showtimes: [{ date: "Jan 30-Feb 15", times: ["7:30 PM (weekdays)", "2:00 PM, 7:30 PM (weekends)"] }], capacity: 500 },
+                { theater: "Kravis Center for the Performing Arts", city: "West Palm Beach", state: "FL", address: "701 Okeechobee Blvd, West Palm Beach, FL 33401", dates: "Feb 2–3, 2026", showtimes: [{ date: "Feb 2", times: ["7:30 PM"] }, { date: "Feb 3", times: ["7:30 PM"] }], capacity: 2195 },
+                { theater: "W.L. Jack Howard Theatre", city: "Monroe", state: "LA", address: "401 Lea Joyner Expy, Monroe, LA 71201", dates: "Feb 3, 2026", showtimes: [{ date: "Feb 3", times: ["7:30 PM"] }], capacity: 2200 },
+                { theater: "Youkey Theatre, RP Funding Center", city: "Lakeland", state: "FL", address: "701 W Lime St, Lakeland, FL 33815", dates: "Feb 3–4, 2026", showtimes: [{ date: "Feb 3", times: ["7:30 PM"] }, { date: "Feb 4", times: ["2:00 PM"] }], capacity: 2286 },
+                { theater: "Duke Energy Center for the Arts – Mahaffey Theater", city: "St. Petersburg/Tampa", state: "FL", address: "400 1st St S, St. Petersburg, FL 33701", dates: "Feb 6–8, 2026", showtimes: [{ date: "Feb 6", times: ["7:30 PM"] }, { date: "Feb 7", times: ["2:00 PM"] }, { date: "Feb 8", times: ["2:00 PM"] }], capacity: 2031 },
+                { theater: "Cannon Center for the Performing Arts", city: "Memphis", state: "TN", address: "255 N Main St, Memphis, TN 38103", dates: "Feb 10, 2026", showtimes: [{ date: "Feb 10", times: ["7:30 PM"] }], capacity: 2050 },
+                { theater: "Thrasher-Horne Center", city: "Orange Park", state: "FL", address: "283 College Dr, Orange Park, FL 32065", dates: "Feb 10–11, 2026", showtimes: [{ date: "Feb 10", times: ["7:30 PM"] }, { date: "Feb 11", times: ["7:30 PM"] }], capacity: 1725 },
+                { theater: "Knoxville Civic Auditorium and Coliseum", city: "Knoxville", state: "TN", address: "500 Howard Baker Jr Ave, Knoxville, TN 37915", dates: "Feb 14–15, 2026", showtimes: [{ date: "Feb 14", times: ["2:00 PM"] }, { date: "Feb 15", times: ["2:00 PM"] }], capacity: 2500 },
+                { theater: "Broward Center for the Performing Arts – Au-Rene Theatre", city: "Fort Lauderdale", state: "FL", address: "201 SW 5th Ave, Fort Lauderdale, FL 33312", dates: "Feb 17–18, 2026", showtimes: [{ date: "Feb 17", times: ["7:30 PM"] }, { date: "Feb 18", times: ["2:00 PM", "7:30 PM"] }], capacity: 2658 },
+                { theater: "Belk Theater at Blumenthal Performing Arts Center", city: "Charlotte", state: "NC", address: "130 N Tryon St, Charlotte, NC 28202", dates: "Feb 20–22, 2026", showtimes: [{ date: "Feb 20", times: ["7:30 PM"] }, { date: "Feb 21", times: ["2:00 PM", "7:30 PM"] }, { date: "Feb 22", times: ["2:00 PM"] }], capacity: 2100 },
+                { theater: "McAllen Performing Arts Center", city: "McAllen", state: "TX", address: "801 Convention Center Blvd, McAllen, TX 78501", dates: "Feb 21–22, 2026", showtimes: [{ date: "Feb 21", times: ["7:00 PM"] }, { date: "Feb 22", times: ["2:00 PM"] }], capacity: 1800 },
+                { theater: "Steven Tanger Center for the Performing Arts", city: "Greensboro", state: "NC", address: "300 N Elm St, Greensboro, NC 27401", dates: "Mar 4, 2026", showtimes: [{ date: "Mar 4", times: ["7:30 PM"] }], capacity: 3000 },
+                { theater: "Memorial Auditorium at Martin Marietta Center", city: "Raleigh", state: "NC", address: "2 E South St, Raleigh, NC 27601", dates: "Mar 7–8, 2026", showtimes: [{ date: "Mar 7", times: ["7:30 PM"] }, { date: "Mar 8", times: ["2:00 PM"] }], capacity: 2277 },
+                { theater: "Koger Center for the Arts", city: "Columbia", state: "SC", address: "1051 Greene St, Columbia, SC 29201", dates: "Mar 10–11, 2026", showtimes: [{ date: "Mar 10", times: ["7:30 PM"] }, { date: "Mar 11", times: ["7:30 PM"] }], capacity: 2248 },
+                { theater: "Wagner Noël Performing Arts Center", city: "Midland", state: "TX", address: "1559 N FM 1788, Midland, TX 79707", dates: "Mar 11, 2026", showtimes: [{ date: "Mar 11", times: ["7:30 PM"] }], capacity: 1811 },
+                { theater: "George S. and Dolores Doré Eccles Theater", city: "Salt Lake City", state: "UT", address: "131 S Main St, Salt Lake City, UT 84111", dates: "Mar 13–18, 2026", showtimes: [{ date: "Mar 13", times: ["7:00 PM"] }, { date: "Mar 14", times: ["2:00 PM", "7:00 PM"] }, { date: "Mar 15", times: ["2:00 PM"] }, { date: "Mar 17", times: ["7:00 PM"] }, { date: "Mar 18", times: ["2:00 PM"] }], capacity: 2468 },
+                { theater: "Adrienne Arsht Center for the Performing Arts", city: "Miami", state: "FL", address: "1300 Biscayne Blvd, Miami, FL 33132", dates: "Mar 13–15, 2026", showtimes: [{ date: "Mar 13", times: ["7:30 PM"] }, { date: "Mar 14", times: ["2:00 PM", "7:30 PM"] }, { date: "Mar 15", times: ["2:00 PM"] }], capacity: 2400 },
+                { theater: "The Plaza Theatre", city: "El Paso", state: "TX", address: "125 Pioneer Plaza, El Paso, TX 79901", dates: "Mar 14, 2026", showtimes: [{ date: "Mar 14", times: ["7:30 PM"] }], capacity: 2050 },
+                { theater: "RiverCenter for the Performing Arts", city: "Columbus", state: "GA", address: "900 Broadway, Columbus, GA 31901", dates: "Mar 17, 2026", showtimes: [{ date: "Mar 17", times: ["7:30 PM"] }], capacity: 2000 },
+                { theater: "Montgomery Performing Arts Centre", city: "Montgomery", state: "AL", address: "201 Tallapoosa St, Montgomery, AL 36104", dates: "Mar 18, 2026", showtimes: [{ date: "Mar 18", times: ["7:30 PM"] }], capacity: 1750 },
+                { theater: "The David H. Koch Theater at Lincoln Center", city: "New York City", state: "NY", address: "20 Lincoln Center Plaza, New York, NY 10023", dates: "Mar 25–Apr 12, 2026", showtimes: [{ date: "Mar 25", times: ["7:00 PM"] }, { date: "Mar 26", times: ["2:00 PM", "7:00 PM"] }, { date: "Mar 27", times: ["7:00 PM"] }, { date: "Mar 28", times: ["1:00 PM", "6:00 PM"] }, { date: "Mar 29", times: ["1:00 PM"] }, { date: "Apr 1", times: ["2:00 PM", "7:00 PM"] }, { date: "Apr 2", times: ["2:00 PM"] }, { date: "Apr 3", times: ["7:00 PM"] }, { date: "Apr 4", times: ["1:00 PM", "6:00 PM"] }, { date: "Apr 5", times: ["1:00 PM"] }, { date: "Apr 8", times: ["2:00 PM"] }, { date: "Apr 9", times: ["2:00 PM"] }, { date: "Apr 10", times: ["7:00 PM"] }, { date: "Apr 11", times: ["1:00 PM", "6:00 PM"] }, { date: "Apr 12", times: ["1:00 PM"] }], capacity: 2586 },
+                { theater: "SAFE Credit Union Performing Arts Center", city: "Sacramento", state: "CA", address: "1301 L St, Sacramento, CA 95814", dates: "Mar 26–29, 2026", showtimes: [{ date: "Mar 26", times: ["7:00 PM"] }, { date: "Mar 27", times: ["2:00 PM", "7:00 PM"] }, { date: "Mar 28", times: ["2:00 PM", "7:00 PM"] }, { date: "Mar 29", times: ["1:00 PM"] }], capacity: 2392 },
+                { theater: "Marion Oliver McCaw Hall", city: "Seattle", state: "WA", address: "321 Mercer St, Seattle, WA 98109", dates: "Apr 1–5, 2026", showtimes: [{ date: "Apr 1", times: ["7:00 PM"] }, { date: "Apr 2", times: ["2:00 PM"] }, { date: "Apr 3", times: ["7:00 PM"] }, { date: "Apr 4", times: ["2:00 PM", "7:00 PM"] }, { date: "Apr 5", times: ["2:00 PM"] }], capacity: 2896 },
+                { theater: "Pikes Peak Center for the Performing Arts", city: "Colorado Springs", state: "CO", address: "190 S Cascade Ave, Colorado Springs, CO 80903", dates: "Apr 3–5, 2026", showtimes: [{ date: "Apr 3", times: ["7:00 PM"] }, { date: "Apr 4", times: ["2:00 PM", "7:00 PM"] }, { date: "Apr 5", times: ["2:00 PM"] }], capacity: 1989 },
+                { theater: "Ellie Caulkins Opera House", city: "Denver", state: "CO", address: "1101 13th St, Denver, CO 80204", dates: "Apr 8–12, 2026", showtimes: [{ date: "Apr 8", times: ["7:00 PM"] }, { date: "Apr 9", times: ["7:00 PM"] }, { date: "Apr 10", times: ["7:00 PM"] }, { date: "Apr 11", times: ["2:00 PM", "7:00 PM"] }, { date: "Apr 12", times: ["2:00 PM"] }], capacity: 2225 },
+                { theater: "Boch Center Wang Theatre", city: "Boston", state: "MA", address: "270 Tremont St, Boston, MA 02116", dates: "Apr 10–12, 2026", showtimes: [{ date: "Apr 10", times: ["7:30 PM"] }, { date: "Apr 11", times: ["2:00 PM", "7:30 PM"] }, { date: "Apr 12", times: ["2:00 PM"] }], capacity: 3500 },
+                { theater: "The Hippodrome Theatre", city: "Baltimore", state: "MD", address: "12 N Eutaw St, Baltimore, MD 21201", dates: "Apr 18–19, 2026", showtimes: [{ date: "Apr 18", times: ["2:00 PM", "7:30 PM"] }, { date: "Apr 19", times: ["2:00 PM"] }], capacity: 2284 },
+                { theater: "Chrysler Hall", city: "Norfolk", state: "VA", address: "215 St Pauls Blvd, Norfolk, VA 23510", dates: "Apr 22–23, 2026", showtimes: [{ date: "Apr 22", times: ["7:30 PM"] }, { date: "Apr 23", times: ["1:00 PM"] }], capacity: 2500 },
+                { theater: "The Hanover Theatre", city: "Worcester", state: "MA", address: "2 Southbridge St, Worcester, MA 01608", dates: "Apr 25–26, 2026", showtimes: [{ date: "Apr 25", times: ["1:30 PM", "7:00 PM"] }, { date: "Apr 26", times: ["1:30 PM"] }], capacity: 2300 },
+                { theater: "New Jersey Performing Arts Center", city: "Newark", state: "NJ", address: "1 Center St, Newark, NJ 07102", dates: "Apr 29–May 3, 2026", showtimes: [{ date: "Apr 29", times: ["7:30 PM"] }, { date: "Apr 30", times: ["7:30 PM"] }, { date: "May 1", times: ["7:30 PM"] }, { date: "May 2", times: ["2:00 PM", "7:30 PM"] }, { date: "May 3", times: ["2:00 PM"] }], capacity: 2868 }
             ];
+
+            // Deep copy for initial data, to be used when logging out
+            let initialData = JSON.parse(JSON.stringify(performanceData));
 
             const translations = {
                 en: {
@@ -270,32 +326,90 @@
             const stateFilter = document.getElementById('state-filter');
             const loader = document.getElementById('loader');
 
-            const modal = document.getElementById('details-modal');
+            const detailsModal = document.getElementById('details-modal');
+            const detailsModalCloseBtn = document.getElementById('details-modal-close');
             const modalTitle = document.getElementById('modal-title');
             const modalAddressLink = document.getElementById('modal-address-link');
             const modalDates = document.getElementById('modal-dates');
             const modalCapacity = document.getElementById('modal-capacity');
             const modalTimes = document.getElementById('modal-times');
-            const modalCloseBtn = document.getElementById('modal-close');
             
+            const editingLoginBtn = document.getElementById('editing-login-btn');
+            const editingLogoutBtn = document.getElementById('editing-logout-btn');
+            const editingSection = document.getElementById('editing-section');
+            const editTextArea = document.getElementById('edit-textarea');
+            const updateScheduleBtn = document.getElementById('update-schedule-btn');
+
+            const messageModal = document.getElementById('message-modal');
+            const messageModalTitle = document.getElementById('message-modal-title');
+            const messageModalText = document.getElementById('message-modal-text');
+            const messageModalCloseBtn = document.getElementById('message-modal-close');
+            const messageModalConfirmBtn = document.getElementById('message-modal-confirm');
+            const loginInputs = document.getElementById('login-inputs');
+            const usernameInput = document.getElementById('username');
+            const passwordInput = document.getElementById('password');
+            
+            let processedData = [];
             let currentSort = { column: 'startDate', order: 'asc' };
             let chartInstance = null;
             
+            const CREDENTIALS = { user: 'Jason', password: '120627' };
+            
+            function showMessageModal(title, message, isLogin = false) {
+                messageModalTitle.textContent = title;
+                messageModalText.textContent = message;
+                if (isLogin) {
+                    loginInputs.classList.remove('hidden');
+                    messageModalConfirmBtn.classList.remove('hidden');
+                    usernameInput.value = '';
+                    passwordInput.value = '';
+                } else {
+                    loginInputs.classList.add('hidden');
+                    messageModalConfirmBtn.classList.add('hidden');
+                }
+                messageModal.classList.remove('hidden');
+                messageModal.classList.add('flex');
+            }
+
+            function closeModal(modalElement) {
+                modalElement.classList.add('hidden');
+                modalElement.classList.remove('flex');
+            }
+
             function parseDate(dateStr) {
                 const monthDay = dateStr.split(' ')[0] + " " + dateStr.split(' ')[1].match(/\d+/)[0];
                 let year = dateStr.includes('2025') ? 2025 : 2026;
-                if (dateStr.toLowerCase().includes('dec')) {
-                    year = 2025;
+                const dateParts = dateStr.split('–');
+                if (dateParts.length > 1) {
+                    const monthPart = dateParts[0].split(' ')[0];
+                    if (monthPart.toLowerCase().includes('dec')) {
+                        year = 2025;
+                    } else if (monthPart.toLowerCase().includes('jan') || monthPart.toLowerCase().includes('feb')) {
+                        year = 2026;
+                    }
                 }
                 return new Date(`${monthDay}, ${year}`);
             }
 
-            const processedData = performanceData.map(d => ({
-                ...d,
-                startDate: parseDate(d.dates),
-                showCount: (d.times.match(/PM|AM/g) || []).length
-            }));
+            function processAndRenderData(data) {
+                 processedData = data.map(d => ({
+                    ...d,
+                    startDate: parseDate(d.dates),
+                    showCount: d.showtimes.reduce((sum, current) => sum + current.times.length, 0)
+                }));
+                updateKPIs(processedData);
+                populateStateFilter();
+                filterAndRender();
+                renderChart();
+            }
             
+            function updateAllContent() {
+                updateKPIs(processedData);
+                populateStateFilter();
+                filterAndRender();
+                renderChart();
+            }
+
             function sortData(data, column, order) {
                 return [...data].sort((a, b) => {
                     let valA = a[column];
@@ -310,7 +424,7 @@
                 });
             }
 
-            function showModal(item) {
+            function showDetailsModal(item) {
                 modalTitle.textContent = `${item.theater}`;
                 
                 modalAddressLink.textContent = item.address;
@@ -320,16 +434,14 @@
                 modalDates.textContent = item.dates;
                 modalCapacity.textContent = item.capacity.toLocaleString();
                 
-                const formattedTimes = item.times.replace(/, (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/g, '\n$1').trim();
-                modalTimes.textContent = formattedTimes;
+                let formattedTimes = "";
+                item.showtimes.forEach(showtime => {
+                    formattedTimes += `${showtime.date}: ${showtime.times.join(', ')}\n`;
+                });
+                modalTimes.textContent = formattedTimes.trim();
                 
-                modal.classList.remove('hidden');
-                modal.classList.add('flex');
-            }
-
-            function closeModal() {
-                modal.classList.add('hidden');
-                modal.classList.remove('flex');
+                detailsModal.classList.remove('hidden');
+                detailsModal.classList.add('flex');
             }
 
             function renderTable(data) {
@@ -348,7 +460,7 @@
                         <td class="px-6 py-4">${item.dates}</td>
                         <td class="px-6 py-4">${item.capacity.toLocaleString()}</td>
                     `;
-                    row.addEventListener('click', () => showModal(item));
+                    row.addEventListener('click', () => showDetailsModal(item));
                     tableBody.appendChild(row);
                 });
             }
@@ -365,15 +477,12 @@
                     }
                 });
                 
-                // Special handling for the search input placeholder
                 const searchInput = document.getElementById('search-input');
                 searchInput.placeholder = lang === 'zh' ? '例如：纽约 或 林肯中心' : 'e.g., New York or Lincoln Center';
                 
-                // Special handling for `All States` option
                 const allStatesOption = document.querySelector('#state-filter option[value="all"]');
                 allStatesOption.textContent = translations[lang].allStates;
 
-                // Re-render table and chart with the new language
                 filterAndRender();
                 renderChart();
             }
@@ -388,6 +497,10 @@
             }
 
             function populateStateFilter() {
+                // Clear existing options, except "All States"
+                while (stateFilter.options.length > 1) {
+                    stateFilter.remove(1);
+                }
                 const states = [...new Set(processedData.map(item => item.state))].sort();
                 states.forEach(state => {
                     const option = document.createElement('option');
@@ -474,7 +587,8 @@
                     }
                 });
             }
-
+            
+            // Event Listeners
             document.querySelectorAll('th[data-sort]').forEach(th => {
                 th.addEventListener('click', () => {
                     const column = th.dataset.sort;
@@ -487,20 +601,69 @@
             searchInput.addEventListener('input', filterAndRender);
             stateFilter.addEventListener('change', filterAndRender);
             languageSwitcher.addEventListener('change', (e) => updateLanguage(e.target.value));
-            modalCloseBtn.addEventListener('click', closeModal);
-            modal.addEventListener('click', (e) => {
+            
+            detailsModalCloseBtn.addEventListener('click', () => closeModal(detailsModal));
+            detailsModal.addEventListener('click', (e) => {
                 if (e.target.id === 'details-modal') {
-                    closeModal();
+                    closeModal(detailsModal);
+                }
+            });
+            
+            messageModalCloseBtn.addEventListener('click', () => closeModal(messageModal));
+            messageModal.addEventListener('click', (e) => {
+                if (e.target.id === 'message-modal' && !loginInputs.contains(e.target)) {
+                    closeModal(messageModal);
                 }
             });
 
+            editingLoginBtn.addEventListener('click', () => {
+                showMessageModal("Login", "Please enter your username and password.", true);
+            });
+            
+            messageModalConfirmBtn.addEventListener('click', () => {
+                const user = usernameInput.value;
+                const pass = passwordInput.value;
+                
+                if (user === CREDENTIALS.user && pass === CREDENTIALS.password) {
+                    closeModal(messageModal);
+                    editingSection.classList.remove('hidden');
+                    editingLoginBtn.classList.add('hidden');
+                    editingLogoutBtn.classList.remove('hidden');
+                    showMessageModal("Success!", "You have successfully logged in and can now edit the schedule.", false);
+                    editTextArea.value = JSON.stringify(performanceData, null, 2);
+                } else {
+                    showMessageModal("Error", "Invalid username or password.", false);
+                }
+            });
+
+            editingLogoutBtn.addEventListener('click', () => {
+                editingSection.classList.add('hidden');
+                editingLoginBtn.classList.remove('hidden');
+                editingLogoutBtn.classList.add('hidden');
+                showMessageModal("Logged Out", "You have been logged out of editing mode.", false);
+            });
+
+            updateScheduleBtn.addEventListener('click', () => {
+                try {
+                    const newData = JSON.parse(editTextArea.value);
+                    if (Array.isArray(newData)) {
+                        performanceData = newData;
+                        processAndRenderData(performanceData);
+                        showMessageModal("Update Successful", "The schedule has been updated with your new data.", false);
+                    } else {
+                        showMessageModal("Error", "Invalid JSON format. Please paste a valid JSON array.", false);
+                    }
+                } catch (e) {
+                    showMessageModal("Error", `Invalid JSON format: ${e.message}`, false);
+                }
+            });
+            
+            // Initial data load and render
             setTimeout(() => {
                 loader.style.display = 'none';
                 document.querySelector('#table-section .overflow-x-auto').style.display = 'block';
-                
-                updateKPIs(processedData);
-                populateStateFilter();
-                updateLanguage('en'); // Set initial language to English
+                processAndRenderData(performanceData);
+                updateLanguage('en');
             }, 1000);
         });
     </script>
