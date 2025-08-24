@@ -236,7 +236,7 @@
 
     <footer class="bg-white mt-12 py-6 border-t border-slate-200">
         <div class="container mx-auto px-4 sm:px-6 lg:px-8 text-center text-slate-500 text-sm">
-            <p data-i18n="footerText">&copy; 2025 Interactive Schedule. Data compiled from publicly available sources for informational purposes.</p>
+            <p data-i18n="footerText">© 2025 Interactive Schedule. Data compiled from publicly available sources for informational purposes.</p>
         </div>
     </footer>
 
@@ -317,7 +317,7 @@
                     modalCapacity: "Seating Capacity:",
                     modalTimesHeader: "Performance Times:",
                     modalNotFound: "No performances found matching your criteria.",
-                    footerText: "&copy; 2025 Interactive Schedule. Data compiled from publicly available sources for informational purposes."
+                    footerText: "© 2025 Interactive Schedule. Data compiled from publicly available sources for informational purposes."
                 },
                 zh: {
                     headerTitle: "神韵美国巡演",
@@ -342,7 +342,7 @@
                     modalCapacity: "座位容量：",
                     modalTimesHeader: "演出时间：",
                     modalNotFound: "未找到符合您条件的演出。",
-                    footerText: "&copy; 2025 神韵互动时间表。数据来自公开来源，仅供参考。"
+                    footerText: "© 2025 神韵互动时间表。数据来自公开来源，仅供参考。"
                 }
             };
 
@@ -618,6 +618,26 @@
                     }
                 });
             }
+
+            // Function to generate the full HTML content with updated data
+            function generateUpdatedHtml() {
+                // This is a crucial function. We need to create a new HTML string
+                // that includes the updated performanceData. The simplest way
+                // is to take the existing performanceData variable, stringify it,
+                // and inject it back into the HTML template.
+                const newPerformanceDataString = JSON.stringify(performanceData, null, 4);
+
+                // Get the current HTML and replace the old performanceData array with the new one
+                const originalHtml = document.documentElement.outerHTML;
+
+                // Create a pattern to find the performanceData array in the script tag
+                const pattern = /let performanceData = \[[\s\S]*?\];/;
+                
+                // Replace the old data with the new data
+                const updatedHtml = originalHtml.replace(pattern, `let performanceData = ${newPerformanceDataString};`);
+                
+                return '<!DOCTYPE html>\n' + updatedHtml;
+            }
             
             // Event Listeners
             document.querySelectorAll('th[data-sort]').forEach(th => {
@@ -781,25 +801,21 @@
 
             // Event listener for the new export button
             exportCodeBtn.addEventListener('click', () => {
-                try {
-                    const fullCode = `<!DOCTYPE html>\n` + document.documentElement.outerHTML;
-
-                    const tempTextarea = document.createElement('textarea');
-                    tempTextarea.value = fullCode;
-                    document.body.appendChild(tempTextarea);
-
-                    tempTextarea.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(tempTextarea);
-
-                    exportCodeBtn.textContent = 'Copied!';
-                    setTimeout(() => {
-                        exportCodeBtn.textContent = 'Export Full Code';
-                    }, 2000);
-                } catch (error) {
-                    console.error("Failed to copy code:", error);
-                    showMessageModal("Copy Error", "Failed to copy code to clipboard. Please try again or manually copy the code.", false);
-                }
+                const fullCode = generateUpdatedHtml();
+                const blob = new Blob([fullCode], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'index.html';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                exportCodeBtn.textContent = 'Downloaded!';
+                setTimeout(() => {
+                    exportCodeBtn.textContent = 'Export Full Code';
+                }, 2000);
             });
             
             // Initial data load and render
