@@ -698,10 +698,14 @@
                     return;
                 }
                 
-                // Split the text into lines, filter out empty lines, and trim whitespace
                 const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+                
+                if (lines.length < 7) {
+                    showMessageModal("Error", "Invalid text format. The text block must contain at least 7 lines.", false);
+                    return;
+                }
 
-                // Assuming the theater name is the second non-empty line
+                // The theater name is the second line in this new format
                 const theaterName = lines[1];
                 const theaterIndex = performanceData.findIndex(item => item.theater.trim() === theaterName);
                 
@@ -709,21 +713,20 @@
                     showMessageModal("Error", `Could not find a theater matching "${theaterName}".`, false);
                     return;
                 }
-
-                // The date and time information starts on the 6th line (index 5)
-                const eventDataLines = lines.slice(5);
-                if (eventDataLines.length % 4 !== 0) {
-                    showMessageModal("Error", "Invalid text format. Date and time entries should be in sets of four lines (Day, Month, Date, Time).", false);
-                    return;
-                }
-
-                // Process the new showtimes based on the multi-line format
+                
                 const newShowtimes = {};
-                for (let i = 0; i < eventDataLines.length; i += 4) {
-                    const dayOfWeek = eventDataLines[i];
-                    const month = eventDataLines[i + 1];
-                    const dayOfMonth = eventDataLines[i + 2];
-                    const time = eventDataLines[i + 3];
+                // The showtime data starts at index 6 in this new format
+                for (let i = 6; i < lines.length; i += 4) {
+                    const dayOfWeek = lines[i];
+                    const month = lines[i + 1];
+                    const dayOfMonth = lines[i + 2];
+                    const time = lines[i + 3];
+
+                    // Check for invalid data before proceeding
+                    if (!month || !dayOfMonth || !time) {
+                        showMessageModal("Error", "Invalid text format. Ensure each performance has a month, day, and time.", false);
+                        return;
+                    }
 
                     const formattedDate = `${month} ${dayOfMonth}`;
                     
@@ -751,8 +754,12 @@
                 } else {
                     const firstShow = sortedDates[0];
                     const lastShow = sortedDates[sortedDates.length - 1];
-                    const year = new Date().getFullYear();
+                    let year = new Date().getFullYear();
+                    // Handle case where start month is in December (2025) and end month is in next year (2026)
                     const startMonth = firstShow.date.split(' ')[0];
+                    if (startMonth.toLowerCase().includes('dec')) {
+                        year = 2025;
+                    }
                     const endMonth = lastShow.date.split(' ')[0];
 
                     if (startMonth === endMonth) {
