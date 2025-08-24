@@ -148,8 +148,15 @@
                 <p class="mb-2"><strong class="text-slate-800">Seating Capacity:</strong> <span id="modal-capacity"></span></p>
                 <div class="mt-4">
                     <h4 class="font-bold text-slate-800">Performance Times:</h4>
-                    <ul id="modal-times" class="list-disc list-inside mt-2 text-slate-600">
-                    </ul>
+                    <!-- Display performance times with a new line for each date and a comma for same-day times -->
+                    <p id="modal-times" class="mt-2 text-slate-600 whitespace-pre-line"></p>
+                </div>
+                <div class="mt-6 border-t pt-4">
+                    <button id="get-summary-btn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition-colors duration-200">
+                        Get Venue Summary
+                    </button>
+                    <div id="summary-loader" class="loader hidden mt-4"></div>
+                    <div id="venue-summary" class="mt-4 text-slate-700"></div>
                 </div>
             </div>
         </div>
@@ -210,6 +217,9 @@
             const modalCapacity = document.getElementById('modal-capacity');
             const modalTimes = document.getElementById('modal-times');
             const modalCloseBtn = document.getElementById('modal-close');
+            const getSummaryBtn = document.getElementById('get-summary-btn');
+            const summaryLoader = document.getElementById('summary-loader');
+            const venueSummary = document.getElementById('venue-summary');
 
             let currentSort = { column: 'startDate', order: 'asc' };
             let chartInstance = null;
@@ -243,16 +253,79 @@
                 });
             }
 
+            // Function to handle exponential backoff for API calls
+            async function fetchWithExponentialBackoff(url, options, maxRetries = 5, delay = 1000) {
+                for (let i = 0; i < maxRetries; i++) {
+                    try {
+                        const response = await fetch(url, options);
+                        if (response.status === 429) { // Too Many Requests
+                            console.warn(`Rate limit hit, retrying in ${delay}ms...`);
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            delay *= 2; // Exponential increase
+                            continue;
+                        }
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return response;
+                    } catch (error) {
+                        if (i === maxRetries - 1) {
+                            throw error;
+                        }
+                        console.error(`Fetch failed, retrying... Attempt ${i + 1}/${maxRetries}`);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        delay *= 2;
+                    }
+                }
+            }
+
+            // Function to get a summary from the Gemini API
+            async function getVenueSummary(venueName, city, state) {
+                const prompt = `Provide a concise, 100-word summary of the history and significance of the "${venueName}" in "${city}, ${state}".`;
+                const payload = {
+                    contents: [{ role: "user", parts: [{ text: prompt }] }],
+                    model: "gemini-2.5-flash-preview-05-20"
+                };
+                const apiKey = ""
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+                try {
+                    summaryLoader.classList.remove('hidden');
+                    venueSummary.innerHTML = '';
+                    const response = await fetchWithExponentialBackoff(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const result = await response.json();
+                    
+                    if (result.candidates && result.candidates.length > 0 && result.candidates[0].content) {
+                        const summaryText = result.candidates[0].content.parts[0].text;
+                        venueSummary.innerHTML = `<p class="italic text-sm text-slate-500">Venue Summary provided by Gemini</p><p>${summaryText}</p>`;
+                    } else {
+                        venueSummary.textContent = "Could not generate summary. Please try again.";
+                    }
+                } catch (error) {
+                    console.error("Error calling Gemini API:", error);
+                    venueSummary.textContent = "Error generating summary. Please check your network connection or try again later.";
+                } finally {
+                    summaryLoader.classList.add('hidden');
+                }
+            }
+            
             function showModal(item) {
                 modalTitle.textContent = `${item.theater}`;
                 modalDates.textContent = item.dates;
                 modalCapacity.textContent = item.capacity.toLocaleString();
-                modalTimes.innerHTML = '';
-                item.times.split(', ').forEach(time => {
-                    const li = document.createElement('li');
-                    li.textContent = time.trim();
-                    modalTimes.appendChild(li);
-                });
+                
+                // This regex ensures a new line for each new date, while keeping commas for multiple times on the same day.
+                const formattedTimes = item.times.replace(/, (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/g, '\n$1').trim();
+                modalTimes.textContent = formattedTimes;
+
+                // Clear any previous summary and event listeners
+                venueSummary.innerHTML = '';
+                getSummaryBtn.onclick = () => getVenueSummary(item.theater, item.city, item.state);
+                
                 modal.classList.remove('hidden');
                 modal.classList.add('flex');
             }
