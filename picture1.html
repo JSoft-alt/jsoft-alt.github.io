@@ -275,8 +275,8 @@
 
     <script>
         // Password protection
-        const PASSWORD = '120627';
         const USERNAME = 'Jason'
+        const PASSWORD = '120627';
         let isAuthenticated = false;
 
         // DOM elements
@@ -326,10 +326,10 @@
         // Password handling
         passwordForm.addEventListener('submit', (e) => {
             e.preventDefault();
-            const enteredPassword = passwordInput.value;
             const enteredUsername = usernameInput.value;
+            const enteredPassword = passwordInput.value;
             
-            if (enteredPassword === PASSWORD, enteredUsername === USERNAME) {
+            if (enteredUsername === USERNAME, enteredPassword === PASSWORD) {
                 isAuthenticated = true;
                 passwordScreen.style.display = 'none';
                 appContainer.classList.add('authenticated');
