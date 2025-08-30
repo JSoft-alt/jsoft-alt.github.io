@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Overlay Editor (Alpha)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .canvas-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .text-layer-item {
+            transition: all 0.2s ease;
+        }
+        
+        .text-layer-item:hover {
+            transform: translateY(-1px);
+        }
+        
+        .upload-zone {
+            transition: all 0.3s ease;
+        }
+        
+        .upload-zone:hover {
+            transform: scale(1.02);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #3B82F6, #1D4ED8);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #1D4ED8, #1E40AF);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(59, 130, 246, 0.3);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #10B981, #059669);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-success:hover {
+            background: linear-gradient(135deg, #059669, #047857);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
+        }
+        
+        .password-container {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .password-form {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .app-container {
+            display: none;
+        }
+        
+        .app-container.authenticated {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <!-- Password Protection Screen -->
+    <div id="passwordScreen" class="password-container">
+        <div class="password-form w-full max-w-md mx-4">
+            <div class="text-center mb-8">
+                <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full mx-auto mb-4 flex items-center justify-center">
+                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                    </svg>
+                </div>
+                <h1 class="text-2xl font-bold text-gray-800 mb-2">Text Overlay Editor (Alpha)</h1>
+                <p class="text-gray-600">Enter password to access the application</p>
+            </div>
+            
+            <form id="passwordForm" class="space-y-4">
+                <div>
+                    <input 
+                        type="password" 
+                        id="passwordInput" 
+                        placeholder="Enter password"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-lg"
+                        autocomplete="off"
+                    >
+                    <input 
+                        type="username" 
+                        id="usernameInput" 
+                        placeholder="Enter username"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-lg"
+                        autocomplete="off"
+                    >
+                </div>
+                <button 
+                    type="submit" 
+                    class="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-300 transform hover:scale-105"
+                >
+                    Access Editor
+                </button>
+                <div id="passwordError" class="text-red-500 text-sm text-center hidden">
+                    Incorrect password. Please try again.
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div id="appContainer" class="app-container min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        <div class="container mx-auto px-4 py-8">
+            <header class="text-center mb-8">
+                <div class="flex items-center justify-center gap-3 mb-4">
+                    <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                    <h1 class="text-4xl font-bold text-slate-800">Text Overlay Editor</h1>
+                </div>
+                <p class="text-slate-600 text-lg">Upload an image, click to add text, and download your creation</p>
+            </header>
+
+            <div class="grid lg:grid-cols-4 gap-8">
+                <!-- Controls Sidebar -->
+                <div class="lg:col-span-1 space-y-6">
+                    <!-- Upload Section -->
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                        <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                            </svg>
+                            Upload Image
+                        </h3>
+                        
+                        <div id="uploadArea" class="upload-zone border-2 border-dashed border-slate-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors cursor-pointer">
+                            <svg class="w-12 h-12 text-slate-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                            </svg>
+                            <p class="text-slate-600 mb-2">Drop an image here or click to browse</p>
+                            <p class="text-sm text-slate-400">PNG, JPG, JPEG supported</p>
+                        </div>
+
+                        <div id="imageUploaded" class="hidden space-y-4">
+                            <div class="text-sm text-green-600 bg-green-50 p-3 rounded-lg border border-green-200">
+                                ✓ Image loaded successfully
+                            </div>
+                            <button id="changeImageBtn" class="w-full px-4 py-2 text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition-colors">
+                                Change Image
+                            </button>
+                        </div>
+                        
+                        <input type="file" id="fileInput" accept="image/*" class="hidden">
+                    </div>
+
+                    <!-- Text Controls -->
+                    <div id="textControls" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                        <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path>
+                            </svg>
+                            Text Controls
+                        </h3>
+
+                        <button id="addTextBtn" class="btn-primary w-full px-4 py-3 rounded-lg font-medium text-white flex items-center justify-center gap-2 mb-4">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                            </svg>
+                            <span id="addTextBtnText">Add Text Layer</span>
+                        </button>
+
+                        <div id="textEditor" class="hidden space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Text Content</label>
+                                <textarea id="textContent" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none" rows="3" placeholder="Enter your text..."></textarea>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Font Size</label>
+                                <input type="range" id="fontSize" min="12" max="72" value="24" class="w-full accent-blue-600">
+                                <span id="fontSizeValue" class="text-sm text-slate-500">24px</span>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Text Color</label>
+                                <input type="color" id="textColor" value="#000000" class="w-full h-10 rounded-lg border border-slate-300 cursor-pointer">
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Font Family</label>
+                                <select id="fontFamily" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    <option value="Arial">Arial</option>
+                                    <option value="Helvetica">Helvetica</option>
+                                    <option value="Times New Roman">Times New Roman</option>
+                                    <option value="Georgia">Georgia</option>
+                                    <option value="Verdana">Verdana</option>
+                                    <option value="Monaco">Monaco</option>
+                                </select>
+                            </div>
+
+                            <button id="deleteLayerBtn" class="w-full px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                                Delete Layer
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Text Layers List -->
+                    <div id="layersList" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                        <h3 class="text-lg font-semibold text-slate-800 mb-4">Text Layers</h3>
+                        <div id="layersContainer" class="space-y-2"></div>
+                    </div>
+
+                    <!-- Download Section -->
+                    <div id="downloadSection" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                        <button id="downloadBtn" class="btn-success w-full px-6 py-3 text-white rounded-lg font-semibold flex items-center justify-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-4-4m4 4l4-4m6-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Download Image
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Canvas Area -->
+                <div class="lg:col-span-3">
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                        <div id="canvasPlaceholder" class="flex items-center justify-center h-96 bg-slate-50 rounded-lg border-2 border-dashed border-slate-300">
+                            <div class="text-center">
+                                <svg class="w-16 h-16 text-slate-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                </svg>
+                                <p class="text-slate-600 text-lg font-medium">Upload an image to get started</p>
+                                <p class="text-slate-400">Your canvas will appear here</p>
+                            </div>
+                        </div>
+
+                        <div id="canvasArea" class="hidden relative">
+                            <div class="text-center mb-4">
+                                <div id="canvasStatus" class="inline-flex items-center gap-2 bg-slate-100 px-4 py-2 rounded-lg">
+                                    <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path>
+                                    </svg>
+                                    <span class="text-sm font-medium text-slate-600">Add your first text layer</span>
+                                </div>
+                            </div>
+                            
+                            <div class="canvas-container">
+                                <canvas id="canvas" class="border border-slate-300 rounded-lg shadow-sm max-w-full h-auto"></canvas>
+                            </div>
+
+                            <div id="addingTextIndicator" class="hidden absolute top-0 right-0 bg-blue-600 text-white px-3 py-1 rounded-bl-lg rounded-tr-lg">
+                                <span class="text-sm font-medium">Adding Text Mode</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Password protection
+        const PASSWORD = '120627';
+        const USERNAME = 'Jason'
+        let isAuthenticated = false;
+
+        // DOM elements
+        const passwordScreen = document.getElementById('passwordScreen');
+        const appContainer = document.getElementById('appContainer');
+        const passwordForm = document.getElementById('passwordForm');
+        const passwordInput = document.getElementById('passwordInput');
+        const passwordError = document.getElementById('passwordError');
+
+        // App elements
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const imageUploaded = document.getElementById('imageUploaded');
+        const changeImageBtn = document.getElementById('changeImageBtn');
+        const textControls = document.getElementById('textControls');
+        const canvasPlaceholder = document.getElementById('canvasPlaceholder');
+        const canvasArea = document.getElementById('canvasArea');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const addTextBtn = document.getElementById('addTextBtn');
+        const addTextBtnText = document.getElementById('addTextBtnText');
+        const textEditor = document.getElementById('textEditor');
+        const layersList = document.getElementById('layersList');
+        const layersContainer = document.getElementById('layersContainer');
+        const downloadSection = document.getElementById('downloadSection');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const canvasStatus = document.getElementById('canvasStatus');
+        const addingTextIndicator = document.getElementById('addingTextIndicator');
+
+        // Text editor controls
+        const textContent = document.getElementById('textContent');
+        const fontSize = document.getElementById('fontSize');
+        const fontSizeValue = document.getElementById('fontSizeValue');
+        const textColor = document.getElementById('textColor');
+        const fontFamily = document.getElementById('fontFamily');
+        const deleteLayerBtn = document.getElementById('deleteLayerBtn');
+
+        // App state
+        let currentImage = null;
+        let textLayers = [];
+        let selectedLayerId = null;
+        let isAddingText = false;
+        let canvasScale = 1;
+        let isDragging = false;
+        let dragOffset = { x: 0, y: 0 };
+
+        // Password handling
+        passwordForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const enteredPassword = passwordInput.value;
+            const enteredUsername = usernameInput.value;
+            
+            if (enteredPassword === PASSWORD, enteredUsername === USERNAME) {
+                isAuthenticated = true;
+                passwordScreen.style.display = 'none';
+                appContainer.classList.add('authenticated');
+                passwordError.classList.add('hidden');
+            } else {
+                passwordError.classList.remove('hidden');
+                passwordInput.value = '';
+                passwordInput.focus();
+            }
+        });
+
+        // Focus password input on load
+        passwordInput.focus();
+
+        // Image upload handling
+        uploadArea.addEventListener('click', () => fileInput.click());
+        changeImageBtn.addEventListener('click', () => fileInput.click());
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('border-blue-400');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('border-blue-400');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('border-blue-400');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                handleImageUpload(file);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                handleImageUpload(file);
+            }
+        });
+
+        function handleImageUpload(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    currentImage = img;
+                    textLayers = [];
+                    selectedLayerId = null;
+                    
+                    uploadArea.style.display = 'none';
+                    imageUploaded.classList.remove('hidden');
+                    textControls.classList.remove('hidden');
+                    canvasPlaceholder.style.display = 'none';
+                    canvasArea.classList.remove('hidden');
+                    
+                    drawCanvas();
+                    updateUI();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Text layer management
+        addTextBtn.addEventListener('click', () => {
+            isAddingText = !isAddingText;
+            updateAddTextButton();
+            updateCanvasStatus();
+        });
+
+        function updateAddTextButton() {
+            if (isAddingText) {
+                addTextBtn.classList.remove('btn-primary');
+                addTextBtn.classList.add('bg-blue-600', 'text-white', 'shadow-lg');
+                addTextBtnText.textContent = 'Click on image to add text';
+                addingTextIndicator.classList.remove('hidden');
+                canvas.style.cursor = 'crosshair';
+            } else {
+                addTextBtn.classList.add('btn-primary');
+                addTextBtn.classList.remove('bg-blue-600', 'text-white', 'shadow-lg');
+                addTextBtnText.textContent = 'Add Text Layer';
+                addingTextIndicator.classList.add('hidden');
+                canvas.style.cursor = 'default';
+            }
+        }
+
+        function updateCanvasStatus() {
+            const statusIcon = canvasStatus.querySelector('svg');
+            const statusText = canvasStatus.querySelector('span');
+            
+            if (isAddingText) {
+                statusIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12"></path>';
+                statusIcon.classList.remove('text-slate-600');
+                statusIcon.classList.add('text-blue-600');
+                statusText.textContent = 'Click on the image to place text';
+                statusText.classList.remove('text-slate-600');
+                statusText.classList.add('text-blue-600');
+            } else {
+                statusIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path>';
+                statusIcon.classList.remove('text-blue-600');
+                statusIcon.classList.add('text-slate-600');
+                statusText.classList.remove('text-blue-600');
+                statusText.classList.add('text-slate-600');
+                
+                if (textLayers.length === 0) {
+                    statusText.textContent = 'Add your first text layer';
+                } else {
+                    statusText.textContent = `${textLayers.length} text layer${textLayers.length === 1 ? '' : 's'}`;
+                }
+            }
+        }
+
+        canvas.addEventListener('click', (e) => {
+            if (!currentImage) return;
+            
+            if (isDragging) return; // Don't add text if we're dragging
+            
+            if (!isAddingText) {
+                // Check if we clicked on a text layer
+                const rect = canvas.getBoundingClientRect();
+                const x = (e.clientX - rect.left) / canvasScale;
+                const y = (e.clientY - rect.top) / canvasScale;
+                
+                // Find the topmost text layer at this position
+                for (let i = textLayers.length - 1; i >= 0; i--) {
+                    const layer = textLayers[i];
+                    ctx.font = `${layer.fontSize}px ${layer.fontFamily}`;
+                    const metrics = ctx.measureText(layer.text);
+                    
+                    if (x >= layer.x && x <= layer.x + metrics.width &&
+                        y >= layer.y && y <= layer.y + layer.fontSize) {
+                        selectedLayerId = layer.id;
+                        updateUI();
+                        drawCanvas();
+                        return;
+                    }
+                }
+                
+                // If no text layer was clicked, deselect
+                selectedLayerId = null;
+                updateUI();
+                drawCanvas();
+                return;
+            }
+
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / canvasScale;
+            const y = (e.clientY - rect.top) / canvasScale;
+
+            const newLayer = {
+                id: Date.now().toString(),
+                text: 'Your text here',
+                x: x,
+                y: y,
+                fontSize: 24,
+                color: '#000000',
+                fontFamily: 'Arial'
+            };
+
+            textLayers.push(newLayer);
+            selectedLayerId = newLayer.id;
+            isAddingText = false;
+            
+            updateAddTextButton();
+            updateUI();
+            drawCanvas();
+        });
+
+        // Mouse events for dragging
+        canvas.addEventListener('mousedown', (e) => {
+            if (!currentImage || isAddingText) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / canvasScale;
+            const y = (e.clientY - rect.top) / canvasScale;
+            
+            // Check if we clicked on a text layer
+            for (let i = textLayers.length - 1; i >= 0; i--) {
+                const layer = textLayers[i];
+                ctx.font = `${layer.fontSize}px ${layer.fontFamily}`;
+                const metrics = ctx.measureText(layer.text);
+                
+                if (x >= layer.x && x <= layer.x + metrics.width &&
+                    y >= layer.y && y <= layer.y + layer.fontSize) {
+                    selectedLayerId = layer.id;
+                    isDragging = true;
+                    dragOffset.x = x - layer.x;
+                    dragOffset.y = y - layer.y;
+                    canvas.style.cursor = 'grabbing';
+                    updateUI();
+                    drawCanvas();
+                    break;
+                }
+            }
+        });
+        
+        canvas.addEventListener('mousemove', (e) => {
+            if (!currentImage) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / canvasScale;
+            const y = (e.clientY - rect.top) / canvasScale;
+            
+            if (isDragging && selectedLayerId) {
+                const newX = x - dragOffset.x;
+                const newY = y - dragOffset.y;
+                updateLayer(selectedLayerId, { x: newX, y: newY });
+                return;
+            }
+            
+            // Update cursor based on what's under the mouse
+            if (isAddingText) {
+                canvas.style.cursor = 'crosshair';
+                return;
+            }
+            
+            // Check if mouse is over a text layer
+            let overText = false;
+            for (let i = textLayers.length - 1; i >= 0; i--) {
+                const layer = textLayers[i];
+                ctx.font = `${layer.fontSize}px ${layer.fontFamily}`;
+                const metrics = ctx.measureText(layer.text);
+                
+                if (x >= layer.x && x <= layer.x + metrics.width &&
+                    y >= layer.y && y <= layer.y + layer.fontSize) {
+                    overText = true;
+                    break;
+                }
+            }
+            
+            canvas.style.cursor = overText ? 'grab' : 'default';
+        });
+        
+        canvas.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                canvas.style.cursor = 'default';
+            }
+        });
+        
+        canvas.addEventListener('mouseleave', () => {
+            if (isDragging) {
+                isDragging = false;
+                canvas.style.cursor = 'default';
+            }
+        });
+        // Text editor controls
+        textContent.addEventListener('input', (e) => {
+            if (selectedLayerId) {
+                updateLayer(selectedLayerId, { text: e.target.value });
+            }
+        });
+
+        fontSize.addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            fontSizeValue.textContent = `${value}px`;
+            if (selectedLayerId) {
+                updateLayer(selectedLayerId, { fontSize: value });
+            }
+        });
+
+        textColor.addEventListener('change', (e) => {
+            if (selectedLayerId) {
+                updateLayer(selectedLayerId, { color: e.target.value });
+            }
+        });
+
+        fontFamily.addEventListener('change', (e) => {
+            if (selectedLayerId) {
+                updateLayer(selectedLayerId, { fontFamily: e.target.value });
+            }
+        });
+
+        deleteLayerBtn.addEventListener('click', () => {
+            if (selectedLayerId) {
+                deleteLayer(selectedLayerId);
+            }
+        });
+
+        function updateLayer(id, updates) {
+            const layerIndex = textLayers.findIndex(layer => layer.id === id);
+            if (layerIndex !== -1) {
+                textLayers[layerIndex] = { ...textLayers[layerIndex], ...updates };
+                drawCanvas();
+            }
+        }
+
+        function deleteLayer(id) {
+            textLayers = textLayers.filter(layer => layer.id !== id);
+            if (selectedLayerId === id) {
+                selectedLayerId = null;
+            }
+            updateUI();
+            drawCanvas();
+        }
+
+        function selectLayer(id) {
+            selectedLayerId = id;
+            updateUI();
+            drawCanvas();
+        }
+
+        function updateUI() {
+            // Update text editor
+            const selectedLayer = textLayers.find(layer => layer.id === selectedLayerId);
+            if (selectedLayer) {
+                textEditor.classList.remove('hidden');
+                textContent.value = selectedLayer.text;
+                fontSize.value = selectedLayer.fontSize;
+                fontSizeValue.textContent = `${selectedLayer.fontSize}px`;
+                textColor.value = selectedLayer.color;
+                fontFamily.value = selectedLayer.fontFamily;
+            } else {
+                textEditor.classList.add('hidden');
+            }
+
+            // Update layers list
+            if (textLayers.length > 0) {
+                layersList.classList.remove('hidden');
+                downloadSection.classList.remove('hidden');
+                
+                layersContainer.innerHTML = '';
+                textLayers.forEach(layer => {
+                    const layerElement = document.createElement('div');
+                    layerElement.className = `text-layer-item p-3 rounded-lg border cursor-pointer transition-all ${
+                        selectedLayerId === layer.id
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                    }`;
+                    layerElement.onclick = () => selectLayer(layer.id);
+                    
+                    layerElement.innerHTML = `
+                        <p class="font-medium text-sm truncate">${layer.text || 'Empty text'}</p>
+                        <p class="text-xs text-slate-500">Position: (${Math.round(layer.x)}, ${Math.round(layer.y)})</p>
+                    `;
+                    
+                    layersContainer.appendChild(layerElement);
+                });
+            } else {
+                layersList.classList.add('hidden');
+                downloadSection.classList.add('hidden');
+            }
+
+            updateCanvasStatus();
+        }
+
+        function drawCanvas() {
+            drawCanvasWithSelection(true);
+        }
+        
+        function drawCanvasWithSelection(showSelection = true) {
+            if (!canvas || !currentImage) return;
+
+            // Calculate canvas size to fit the container while maintaining aspect ratio
+            const container = canvas.parentElement;
+            if (!container) return;
+
+            const containerWidth = container.clientWidth - 32; // Account for padding
+            const containerHeight = Math.min(600, window.innerHeight * 0.6);
+            
+            const imageAspect = currentImage.width / currentImage.height;
+            const containerAspect = containerWidth / containerHeight;
+
+            let canvasWidth, canvasHeight;
+            
+            if (imageAspect > containerAspect) {
+                canvasWidth = containerWidth;
+                canvasHeight = containerWidth / imageAspect;
+                canvasScale = containerWidth / currentImage.width;
+            } else {
+                canvasHeight = containerHeight;
+                canvasWidth = containerHeight * imageAspect;
+                canvasScale = containerHeight / currentImage.height;
+            }
+
+            canvas.width = currentImage.width;
+            canvas.height = currentImage.height;
+            canvas.style.width = `${canvasWidth}px`;
+            canvas.style.height = `${canvasHeight}px`;
+
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw image
+            ctx.drawImage(currentImage, 0, 0);
+
+            // Draw text layers
+            textLayers.forEach(layer => {
+                ctx.font = `${layer.fontSize}px ${layer.fontFamily}`;
+                ctx.fillStyle = layer.color;
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'top';
+                ctx.fillText(layer.text, layer.x, layer.y);
+
+                // Draw selection indicator if this layer is selected and we want to show selection
+                if (showSelection && layer.id === selectedLayerId) {
+                    const metrics = ctx.measureText(layer.text);
+                    const textHeight = layer.fontSize;
+                    
+                    ctx.strokeStyle = '#3B82F6';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 5]);
+                    ctx.strokeRect(layer.x - 2, layer.y - 2, metrics.width + 4, textHeight + 4);
+                    ctx.setLineDash([]);
+                }
+            });
+        }
+
+        // Download functionality
+        downloadBtn.addEventListener('click', () => {
+            if (!canvas) return;
+            
+            // Redraw canvas without selection indicators
+            drawCanvasWithSelection(false);
+
+            const link = document.createElement('a');
+            link.download = 'text-overlay-image.png';
+            link.href = canvas.toDataURL();
+            link.click();
+            
+            // Redraw with selection indicators
+            setTimeout(() => drawCanvas(), 100);
+        });
+
+        // Responsive canvas redraw
+        window.addEventListener('resize', () => {
+            if (currentImage) {
+                drawCanvas();
+            }
+        });
+
+        // Initialize
+        updateUI();
+    </script>
+</body>
+</html>
