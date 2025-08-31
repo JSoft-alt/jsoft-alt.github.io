@@ -79,14 +79,23 @@
     </div>
 
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, collection, query, where, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-analytics.js";
 
-        // IMPORTANT: Use the provided global variables
+        const firebaseConfig = {
+    apiKey: "AIzaSyDhv2o08TxYXZ5Lx9vsRrPnH34XfV5MY4U",
+    authDomain: "shen-yun-qr-code.firebaseapp.com",
+    projectId: "shen-yun-qr-code",
+    storageBucket: "shen-yun-qr-code.firebasestorage.app",
+    messagingSenderId: "476962891596",
+    appId: "1:476962891596:web:5079c435d16a47271611e9",
+    measurementId: "G-KB5NTT76R8"
+  };
+        
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
         setLogLevel('Debug');
@@ -230,7 +239,6 @@
                 alert("Error adding person. See console for details.");
             }
         };
-
         // Initialize Firebase and Auth
         const initFirebase = async () => {
             try {
