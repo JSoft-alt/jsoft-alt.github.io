@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personalized Database</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c;
+            color: #e2e8f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+    </style>
+</head>
+<body>
+    <div id="app-container" class="p-8 md:p-12 bg-gray-800 rounded-2xl shadow-xl max-w-lg w-full">
+        <div id="loading-screen" class="flex flex-col items-center justify-center space-y-4">
+            <svg class="animate-spin h-8 w-8 text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="text-sm">Initializing...</p>
+        </div>
+
+        <!-- Password protected view for a specific person -->
+        <div id="person-view" class="hidden">
+            <h1 class="text-2xl font-bold mb-4 text-center">Protected Access</h1>
+            <p class="mb-4 text-center text-gray-400">Enter the password to view this person's details.</p>
+            <div id="password-form" class="flex flex-col space-y-4">
+                <input type="password" id="password-input" placeholder="Enter password" class="px-4 py-2 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all duration-300">
+                <button id="password-submit-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300 shadow-md">
+                    Unlock
+                </button>
+            </div>
+            <div id="person-details" class="hidden mt-6">
+                <h2 id="person-name" class="text-3xl font-extrabold text-white mb-2 text-center"></h2>
+                <div id="person-data" class="bg-gray-700 p-6 rounded-lg shadow-inner"></div>
+            </div>
+            <div id="error-message" class="hidden mt-4 text-center text-red-400"></div>
+        </div>
+
+        <!-- Main dashboard to manage entries -->
+        <div id="dashboard" class="hidden">
+            <h1 class="text-2xl font-bold mb-6 text-center">Database Management</h1>
+            <div id="user-id-display" class="bg-gray-700 p-2 rounded-lg text-sm mb-4">
+                User ID: <span class="font-mono text-gray-300 text-xs break-all"></span>
+            </div>
+            <div id="password-info" class="bg-yellow-800 text-yellow-200 p-4 rounded-lg text-sm mb-6">
+                The password for all records is `password123`. This is a client-side check.
+            </div>
+
+            <!-- Form to add new person -->
+            <h2 class="text-xl font-semibold mb-4">Add New Person</h2>
+            <form id="add-person-form" class="space-y-4">
+                <input type="text" id="name-input" placeholder="Person's Name (e.g., Jane Doe)" required class="w-full px-4 py-2 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all duration-300">
+                <textarea id="data-input" placeholder="Additional data (e.g., Job, Hobbies, etc.)" rows="3" class="w-full px-4 py-2 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all duration-300"></textarea>
+                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300 shadow-md">
+                    Add Person & Generate QR
+                </button>
+            </form>
+
+            <!-- Display QR code and link -->
+            <div id="result-container" class="hidden mt-8 text-center bg-gray-700 p-6 rounded-lg">
+                <h3 class="text-lg font-bold mb-2 text-emerald-400">QR Code Generated!</h3>
+                <div id="qrcode-container" class="bg-white p-2 rounded-lg inline-block"></div>
+                <p id="url-link" class="mt-4 text-xs font-mono break-all text-gray-400"></p>
+                <button id="copy-url-btn" class="mt-4 bg-gray-600 hover:bg-gray-500 text-white py-2 px-4 rounded-lg transition-all duration-300 text-sm">
+                    Copy URL
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, collection, query, where, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // IMPORTANT: Use the provided global variables
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        setLogLevel('Debug');
+        let db, auth;
+
+        const loadingScreen = document.getElementById('loading-screen');
+        const personView = document.getElementById('person-view');
+        const dashboard = document.getElementById('dashboard');
+        const passwordForm = document.getElementById('password-form');
+        const passwordInput = document.getElementById('password-input');
+        const passwordSubmitBtn = document.getElementById('password-submit-btn');
+        const errorMessage = document.getElementById('error-message');
+        const personDetails = document.getElementById('person-details');
+        const personNameDisplay = document.getElementById('person-name');
+        const personDataDisplay = document.getElementById('person-data');
+        const addPersonForm = document.getElementById('add-person-form');
+        const nameInput = document.getElementById('name-input');
+        const dataInput = document.getElementById('data-input');
+        const resultContainer = document.getElementById('result-container');
+        const qrcodeContainer = document.getElementById('qrcode-container');
+        const urlLink = document.getElementById('url-link');
+        const copyUrlBtn = document.getElementById('copy-url-btn');
+
+        let currentUserId = null;
+        const SECRET_PASSWORD = 'password123';
+
+        // Helper function to sanitize name for URL
+        const sanitizeName = (name) => {
+            return name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        };
+
+        const renderView = (viewId) => {
+            loadingScreen.classList.add('hidden');
+            personView.classList.add('hidden');
+            dashboard.classList.add('hidden');
+            document.getElementById(viewId).classList.remove('hidden');
+        };
+
+        const generateQrCode = (url) => {
+            const qr = qrcode(0, 'H');
+            qr.addData(url);
+            qr.make();
+            const qrSvg = qr.createSvgTag({ cellsize: 8, margin: 4, sh_shadow_color: '#38a169', sh_shadow_size: 4 });
+            qrcodeContainer.innerHTML = qrSvg;
+            resultContainer.classList.remove('hidden');
+            urlLink.textContent = url;
+        };
+
+        const fetchPersonData = async (sanitizedName) => {
+            try {
+                const peopleCollection = collection(db, `artifacts/${appId}/public/data/people`);
+                const q = query(peopleCollection, where("sanitizedName", "==", sanitizedName));
+                const querySnapshot = await getDocs(q);
+
+                if (querySnapshot.empty) {
+                    errorMessage.textContent = 'No person found with this name.';
+                    errorMessage.classList.remove('hidden');
+                    return null;
+                }
+
+                const doc = querySnapshot.docs[0];
+                return doc.data();
+            } catch (error) {
+                console.error("Error fetching document:", error);
+                errorMessage.textContent = 'Error fetching data. Check the console for details.';
+                errorMessage.classList.remove('hidden');
+                return null;
+            }
+        };
+
+        const displayPersonData = (person) => {
+            personNameDisplay.textContent = person.name;
+            let dataHtml = '';
+            // Display JSON data in a user-friendly format
+            const data = JSON.parse(person.data);
+            for (const key in data) {
+                dataHtml += `<p><span class="font-bold text-gray-200">${key}:</span> ${data[key]}</p>`;
+            }
+            personDataDisplay.innerHTML = dataHtml;
+            personDetails.classList.remove('hidden');
+            passwordForm.classList.add('hidden');
+            errorMessage.classList.add('hidden');
+        };
+
+        const handleUrlParams = async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const name = urlParams.get('name');
+            if (name) {
+                renderView('person-view');
+                passwordSubmitBtn.onclick = async () => {
+                    if (passwordInput.value === SECRET_PASSWORD) {
+                        errorMessage.classList.add('hidden');
+                        const person = await fetchPersonData(name);
+                        if (person) {
+                            displayPersonData(person);
+                        }
+                    } else {
+                        errorMessage.textContent = 'Incorrect password.';
+                        errorMessage.classList.remove('hidden');
+                    }
+                };
+            } else {
+                renderView('dashboard');
+            }
+        };
+
+        const handleAddNewPerson = async (e) => {
+            e.preventDefault();
+            const name = nameInput.value.trim();
+            const data = dataInput.value.trim() || '{"Info": "No additional data provided."}';
+            const sanitizedName = sanitizeName(name);
+
+            if (!name) {
+                alert("Please enter a person's name."); // Using modal instead of alert
+                return;
+            }
+
+            try {
+                // Check if a person with this name already exists
+                const existingPerson = await fetchPersonData(sanitizedName);
+                if (existingPerson) {
+                    alert('A person with this name already exists. Please use a unique name.');
+                    return;
+                }
+
+                const peopleCollection = collection(db, `artifacts/${appId}/public/data/people`);
+                await addDoc(peopleCollection, {
+                    name: name,
+                    sanitizedName: sanitizedName,
+                    data: data, // Storing as string
+                });
+
+                const personUrl = `${window.location.origin}${window.location.pathname}?name=${sanitizedName}`;
+                generateQrCode(personUrl);
+
+                // Clear form
+                nameInput.value = '';
+                dataInput.value = '';
+            } catch (error) {
+                console.error("Error adding document:", error);
+                alert("Error adding person. See console for details.");
+            }
+        };
+
+        // Initialize Firebase and Auth
+        const initFirebase = async () => {
+            try {
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        currentUserId = user.uid;
+                        document.querySelector('#user-id-display span').textContent = currentUserId;
+                        handleUrlParams();
+                    } else {
+                        try {
+                           const signInMethod = initialAuthToken ? signInWithCustomToken(auth, initialAuthToken) : signInAnonymously(auth);
+                           await signInMethod;
+                        } catch (error) {
+                            console.error("Firebase auth error:", error);
+                            // Fallback to anonymous sign-in if custom token fails
+                            signInAnonymously(auth);
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error("Firebase initialization failed:", error);
+                loadingScreen.innerHTML = '<p class="text-red-400 text-center">Failed to initialize Firebase. Check console for details.</p>';
+            }
+        };
+
+        // Event Listeners
+        window.onload = initFirebase;
+        addPersonForm.addEventListener('submit', handleAddNewPerson);
+        
+        copyUrlBtn.addEventListener('click', () => {
+            const url = urlLink.textContent;
+            navigator.clipboard.writeText(url).then(() => {
+                const originalText = copyUrlBtn.textContent;
+                copyUrlBtn.textContent = 'Copied!';
+                setTimeout(() => {
+                    copyUrlBtn.textContent = originalText;
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy URL: ', err);
+            });
+        });
+    </script>
+</body>
+</html>
