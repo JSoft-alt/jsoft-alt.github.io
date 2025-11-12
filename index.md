@@ -5,6 +5,8 @@
 ### ***Picture Editor***
 #### [**_Picture Editor_**](https://jsoft-alt.github.io/picture.html)
 #### [**_Picture Editor_**](https://jsoft-alt.github.io/picture1.html)
-#### [**_Word_**](https://jsoft-alt.github.io/word.html)
+### ***Study***
+#### [**_Word (doesnt work yet)_**](https://jsoft-alt.github.io/word.html)
+#### [**_Vocabulary Flashcards_**](https://jsoft-alt.github.io/vocabulary.html)
 ### ***JSoft's GitHub Stats***
 ![Jason's GitHub Stats](https://github-readme-stats.vercel.app/api?username=jsoft-alt&show_icons=true&theme=default)
