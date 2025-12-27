@@ -62,13 +62,15 @@
                 </div>
                 
                 <div class="card p-6">
-                    <h2 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 border-b pb-2">Personnel IDs</h2>
-                    <textarea id="peopleInput" rows="5" class="w-full p-3 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none resize-none focus:ring-2 focus:ring-indigo-500" placeholder="Enter IDs separated by commas...">1,2,3,4,5,6,8,9,10,11,14,15,16,19,20,23,24,25</textarea>
-                    <div class="mt-3 space-y-1 text-[10px] text-slate-400">
-                        <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-500"></span> 19-25: Male</div>
-                        <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-pink-400"></span> Others: Female</div>
-                        <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> D: Driver</div>
-                        <div class="mt-2 text-indigo-600 font-bold italic">Note: 06:00-12:00 requires 2 Drivers</div>
+                    <h2 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 border-b pb-2">Personnel</h2>
+                    <textarea id="peopleInput" rows="8" class="w-full p-3 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none resize-none focus:ring-2 focus:ring-indigo-500" placeholder="Enter numbers (1-25) separated by commas...">1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25</textarea>
+                    <div class="mt-3 space-y-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                        <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-blue-500"></span> Males</div>
+                        <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-pink-400"></span> Females</div>
+                        <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-emerald-500"></span> Driver (D)</div>
+                        <div class="mt-2 p-2 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-100 normal-case">
+                            06:00-12:00 requires 2 Drivers
+                        </div>
                     </div>
                 </div>
             </aside>
@@ -84,6 +86,23 @@
     </div>
 
     <script>
+        const NAME_MAP = {
+            "1": "Qing Wang", "2": "Hao Wang (Diana)", "3": "Ling Young", "4": "Ma Lan (Lotus Li)",
+            "5": "Tham Nguyen (Mina)", "6": "Qing Han", "7": "Le Thi Oanh (Aria)", "8": "Li Han",
+            "9": "Ping Jiang", "10": "Hongjun Zheng (Lucinda)", "11": "Dongxia Sun", 
+            "12": "Xuemei Song (Sophie)", "13": "Deyun Xia", "14": "Lily Jia", 
+            "15": "Tuyet Nhung (Adela)", "16": "Thi Lien Huong (Lotus)", "17": "Ling Wu (Cassie)",
+            "18": "Yongxian Li (Lynna)", "19": "Xiaodong Xu (William)", "20": "Larrison Manygoats",
+            "21": "Zhiyuan Xie (Harry)", "22": "xiaoxiao", "23": "Cong Nguyen (Charles)",
+            "24": "Jincheng Guo (Eric)", "25": "Shunxiang Wu"
+        };
+
+        const MALES = ["19", "20", "21", "22", "23", "24", "25"];
+        const NON_ENGLISH = ["8", "9", "10", "11", "12", "13", "25"];
+        const NON_DRIVERS = ["2", "7", "8", "12", "13", "23", "24", "25"];
+        const AVOID = ["18"];
+        const NEEDS_ENG = ["5", "20", "23"];
+
         const TIME_SLOTS = [
             { label: "00:00-03:00", value: "0-3", isNight: true },
             { label: "03:00-06:00", value: "3-6", isNight: true },
@@ -129,30 +148,26 @@
             const lastEntry = res[res.length - 1];
             if (lastEntry.skipped) return false;
             const lastPlayers = lastEntry.players;
-            if (!lastPlayers || lastPlayers.length === 0) return false;
-            return lastPlayers.some(p => p.id === id1 || p.id === id2);
+            return lastPlayers && lastPlayers.some(p => p.num === id1 || p.num === id2);
         }
 
         document.getElementById('generateBtn').onclick = function() {
             const days = parseInt(document.getElementById('daysInput').value) || 1;
             const startDay = parseInt(document.getElementById('startDayInput').value);
             const startTimeIdx = parseInt(document.getElementById('startTimeInput').value);
-            const rawPeople = document.getElementById('peopleInput').value;
+            const rawInput = document.getElementById('peopleInput').value;
             
-            const peopleList = rawPeople.split(/[,，\s]+/).map(s => s.trim()).filter(s => s);
-            const males = ["19", "20", "21", "22", "23", "24", "25"]; 
-            const nonEnglish = ["8", "9", "10", "11", "12", "13", "25"];
-            const nonDrivers = ["2", "7", "8", "12", "13", "23", "24", "25"];
-            const avoidWork = ["18"]; 
-
-            const activePeople = peopleList
-                .filter(id => !avoidWork.includes(id))
-                .map(id => ({
-                    id,
-                    isMale: males.includes(id),
-                    canEnglish: !nonEnglish.includes(id),
-                    isDriver: !nonDrivers.includes(id),
-                    needsEnglishPartner: ["5", "20", "23"].includes(id)
+            const nums = rawInput.split(/[,，\n\r\s]+/).map(s => s.trim()).filter(s => s && NAME_MAP[s]);
+            
+            const activePeople = nums
+                .filter(n => !AVOID.includes(n))
+                .map(n => ({
+                    num: n,
+                    name: NAME_MAP[n],
+                    isMale: MALES.includes(n),
+                    canEnglish: !NON_ENGLISH.includes(n),
+                    isDriver: !NON_DRIVERS.includes(n),
+                    needsEnglishPartner: NEEDS_ENG.includes(n)
                 }));
 
             currentScheduleData = [];
@@ -176,16 +191,14 @@
 
                             let violations = 0;
 
-                            // NEW RULE: 6-12 MUST HAVE 2 DRIVERS
                             if (slot.value === "6-12") {
-                                if (!(p1.isDriver && p2.isDriver)) {
-                                    violations += 1000; // Force choice of two drivers
-                                }
+                                if (!(p1.isDriver && p2.isDriver)) violations += 1000;
                             }
 
-                            if (isSequential(currentScheduleData, p1.id, p2.id)) violations += 100;
-                            if ((dailyHistory[d][p1.id] || 0) >= 2) violations += 50;
-                            if ((dailyHistory[d][p2.id] || 0) >= 2) violations += 50;
+                            if (isSequential(currentScheduleData, p1.num, p2.num)) violations += 100;
+                            if ((dailyHistory[d][p1.num] || 0) >= 2) violations += 50;
+                            if ((dailyHistory[d][p2.num] || 0) >= 2) violations += 50;
+                            
                             if (slot.isNight && !((p1.isMale && !p2.isMale) || (!p1.isMale && p2.isMale))) violations += 40;
                             if ((p1.needsEnglishPartner && !p2.canEnglish) || (p2.needsEnglishPartner && !p1.canEnglish)) violations += 30;
 
@@ -193,7 +206,6 @@
                             const isLastDayLate = (d === days && slot.value === "18-24");
                             const hasDriver = p1.isDriver || p2.isDriver;
                             
-                            // Adjusting driver rule for non 6-12 slots
                             if (slot.value !== "6-12") {
                                 if (isFirstDay || isLastDayLate) {
                                     if (hasDriver) violations += 25; 
@@ -202,12 +214,9 @@
                                 }
                             }
 
-                            if ((p1.id === "10" || p2.id === "10") && tIdx < 3) violations += 20;
-                            if ((p1.id === "24" || p2.id === "24") && d !== 4) violations += 20;
-                            if ((p1.id === "2" || p2.id === "2") && slot.isNight) violations += 20;
-
-                            const isEngAvoid = (d === 2 && slot.value === "18-24") || (d >= 3 && d <= 4 && ["12-18", "18-24"].includes(slot.value));
-                            if (isEngAvoid && (p1.canEnglish || p2.canEnglish)) violations += 15;
+                            if ((p1.num === "10" || p2.num === "10") && tIdx < 3) violations += 20;
+                            if ((p1.num === "24" || p2.num === "24") && d !== 4) violations += 20;
+                            if ((p1.num === "2" || p2.num === "2") && slot.isNight) violations += 20;
 
                             candidates.push({ pair: [p1, p2], violations });
                         }
@@ -215,24 +224,26 @@
 
                     candidates.sort((a, b) => {
                         if (a.violations !== b.violations) return a.violations - b.violations;
-                        const workloadA = (dailyHistory[d][a.pair[0].id] || 0) + (dailyHistory[d][a.pair[1].id] || 0);
-                        const workloadB = (dailyHistory[d][b.pair[0].id] || 0) + (dailyHistory[d][b.pair[1].id] || 0);
+                        const workloadA = (dailyHistory[d][a.pair[0].num] || 0) + (dailyHistory[d][a.pair[1].num] || 0);
+                        const workloadB = (dailyHistory[d][b.pair[0].num] || 0) + (dailyHistory[d][b.pair[1].num] || 0);
                         return workloadA - workloadB;
                     });
 
-                    const winner = candidates[0].pair;
-                    const hadViolations = candidates[0].violations > 0;
+                    const winner = candidates[0] ? candidates[0].pair : [];
+                    const hadViolations = candidates[0] ? candidates[0].violations > 0 : true;
                     
                     currentScheduleData.push({ 
                         day: d, 
                         slot, 
                         players: winner, 
-                        skipped: false,
+                        skipped: winner.length === 0,
                         optimized: !hadViolations 
                     });
 
-                    dailyHistory[d][winner[0].id] = (dailyHistory[d][winner[0].id] || 0) + 1;
-                    dailyHistory[d][winner[1].id] = (dailyHistory[d][winner[1].id] || 0) + 1;
+                    if(winner.length > 0) {
+                        dailyHistory[d][winner[0].num] = (dailyHistory[d][winner[0].num] || 0) + 1;
+                        dailyHistory[d][winner[1].num] = (dailyHistory[d][winner[1].num] || 0) + 1;
+                    }
                 }
             }
             renderSchedule(currentScheduleData, days);
@@ -248,26 +259,29 @@
                 const dayData = data.filter(i => i.day === d);
                 let dayHtml = `
                     <div class="card overflow-hidden border-slate-200 shadow-sm">
-                        <div class="bg-slate-800 text-white px-6 py-4 flex items-center justify-center">
-                            <h3 class="font-bold text-sm tracking-widest uppercase">Day ${d}</h3>
+                        <div class="bg-slate-800 text-white px-6 py-4 flex items-center justify-between">
+                            <h3 class="font-bold text-sm tracking-widest uppercase mx-auto">Day ${d}</h3>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-5 divide-y md:divide-y-0 md:divide-x divide-slate-100">
                 `;
 
                 dayData.forEach(item => {
                     dayHtml += `
-                        <div class="p-5 slot-card ${item.skipped ? 'skipped' : ''}">
-                            <div class="text-[10px] font-black text-slate-400 mb-4 border-b border-slate-50 pb-1 uppercase tracking-tighter">${item.slot.label}</div>
+                        <div class="p-4 slot-card ${item.skipped ? 'skipped' : ''}">
+                            <div class="text-[10px] font-black text-slate-400 mb-3 border-b border-slate-50 pb-1 uppercase tracking-tighter">${item.slot.label}</div>
                             <div class="space-y-2">
                                 ${item.players.length > 0 ? item.players.map(p => `
-                                    <div class="px-3 py-2 rounded-xl text-xs font-bold flex justify-between items-center shadow-sm border ${!item.optimized ? 'bg-indigo-50/50 border-indigo-100 text-slate-700' : 'bg-white border-slate-100 text-slate-700'}">
-                                        <div class="flex items-center gap-2">
-                                            <span>${p.id}</span>
-                                            ${p.isDriver ? '<span class="is-driver text-[10px] font-black" title="Driver">D</span>' : ''}
+                                    <div class="px-3 py-2 rounded-xl text-xs font-bold flex flex-col shadow-sm border ${!item.optimized ? 'bg-indigo-50/50 border-indigo-100 text-slate-700' : 'bg-white border-slate-100 text-slate-700'}">
+                                        <div class="flex justify-between items-center mb-1">
+                                            <span class="bg-slate-100 px-1.5 py-0.5 rounded text-[10px]">${p.num}</span>
+                                            <div class="flex items-center gap-1">
+                                                <span class="${p.isMale ? 'gender-m' : 'gender-f'} text-[9px] font-black opacity-80">${p.isMale ? 'M' : 'F'}</span>
+                                                ${p.isDriver ? '<span class="is-driver text-[10px] font-black" title="Driver">D</span>' : ''}
+                                            </div>
                                         </div>
-                                        <span class="text-[10px] font-black ${p.isMale ? 'gender-m' : 'gender-f'}">
-                                            ${p.isMale ? 'M' : 'F'}
-                                        </span>
+                                        <div class="text-[9px] leading-tight break-words text-slate-600">
+                                            ${p.name}
+                                        </div>
                                     </div>
                                 `).join('') : '<div class="text-[10px] text-slate-300 italic py-2">--</div>'}
                             </div>
@@ -282,27 +296,22 @@
 
         document.getElementById('exportBtn').onclick = function() {
             if (currentScheduleData.length === 0) return;
-
             let textContent = "BUS SCHEDULE\n====================\n\n";
             let currentDay = -1;
-
             currentScheduleData.forEach(item => {
                 if (item.skipped) return;
-                
                 if (item.day !== currentDay) {
                     currentDay = item.day;
                     textContent += `\n--- DAY ${currentDay} ---\n`;
                 }
-
-                const players = item.players.map(p => `${p.id}(${p.isMale?'M':'F'}${p.isDriver?'D':''})`).join(", ");
+                const players = item.players.map(p => `${p.num} [${p.name}] (${p.isMale?'M':'F'}${p.isDriver?'D':''})`).join(", ");
                 textContent += `[${item.slot.label}] : ${players || "Unassigned"}\n`;
             });
-
             const blob = new Blob([textContent], { type: 'text/plain' });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `Bus_Schedule_${new Date().toISOString().slice(0,10)}.txt`;
+            a.download = `Bus_Schedule.txt`;
             a.click();
             window.URL.revokeObjectURL(url);
         };
