@@ -13,6 +13,7 @@
         .skipped { opacity: 0.5; background-color: #f8fafc !important; }
         .gender-m { color: #3b82f6; }
         .gender-f { color: #f472b6; }
+        .is-driver { color: #10b981; }
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -67,7 +68,7 @@
                     <div class="mt-3 space-y-1 text-[10px] text-slate-400">
                         <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-500"></span> 19-25: Male</div>
                         <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-pink-400"></span> Others: Female</div>
-                        <div class="flex items-center gap-1 italic text-indigo-500 font-medium">★ Guaranteed 100% slot filling</div>
+                        <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> D: Driver</div>
                     </div>
                 </div>
             </aside>
@@ -248,7 +249,10 @@
                             <div class="space-y-2">
                                 ${item.players.length > 0 ? item.players.map(p => `
                                     <div class="px-3 py-2 rounded-xl text-xs font-bold flex justify-between items-center shadow-sm border ${!item.optimized ? 'bg-indigo-50/50 border-indigo-100 text-slate-700' : 'bg-white border-slate-100 text-slate-700'}">
-                                        <span>${p.id}</span>
+                                        <div class="flex items-center gap-2">
+                                            <span>${p.id}</span>
+                                            ${p.isDriver ? '<span class="is-driver text-[10px] font-black" title="Driver">D</span>' : ''}
+                                        </div>
                                         <span class="text-[10px] font-black ${p.isMale ? 'gender-m' : 'gender-f'}">
                                             ${p.isMale ? 'M' : 'F'}
                                         </span>
@@ -278,7 +282,7 @@
                     textContent += `\n--- DAY ${currentDay} ---\n`;
                 }
 
-                const players = item.players.map(p => `${p.id}(${p.isMale?'M':'F'})`).join(", ");
+                const players = item.players.map(p => `${p.id}(${p.isMale?'M':'F'}${p.isDriver?'D':''})`).join(", ");
                 textContent += `[${item.slot.label}] : ${players || "Unassigned"}\n`;
             });
 
