@@ -69,9 +69,6 @@
                         <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-pink-400"></span> Females</div>
                         <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-emerald-500"></span> Driver (D)</div>
                         <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-violet-500"></span> English (E)</div>
-                        <div class="mt-2 p-2 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-100 normal-case">
-                            Strict Rule: No Drivers on Day 1 or final shift. No English speakers in afternoon/evening if possible.
-                        </div>
                     </div>
                 </div>
             </aside>
@@ -97,12 +94,13 @@
             "24": "Jincheng Guo (Eric)", "25": "Shunxiang Wu"
         };
 
-        const MALES = ["19", "20", "21", "22", "23", "24", "25"];
-        const ENGLISH_SPEAKERS = ["1", "2", "3", "4", "5", "6", "7", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24"];
+        const MALES = ["19", "21", "22", "23", "24", "25"];
+        const ENGLISH_SPEAKERS = ["1", "2", "3", "4", "5", "6", "7", "14", "15", "16", "17", "18", "19", "21", "22", "23", "24"];
         const NON_ENGLISH = ["8", "9", "10", "11", "12", "13", "25"];
         const NON_DRIVERS = ["2", "7", "8", "12", "13", "23", "24", "25"];
-        const AVOID = ["18", "19"];
-        const NEEDS_ENG = ["5", "20", "23"];
+        // Explicitly including 20 in AVOID to ensure removal
+        const AVOID = ["18", "19", "20"]; 
+        const NEEDS_ENG = ["5", "23"];
 
         const TIME_SLOTS = [
             { label: "00:00-03:00", value: "0-3", isNight: true },
@@ -203,8 +201,8 @@
 
                             // Rule: Try not to put english in 12-18, 18-24
                             if (slot.value === "12-18" || slot.value === "18-24") {
-                                if (p1.isEnglish) violations += 500;
-                                if (p2.isEnglish) violations += 500;
+                                if (p1.isEnglish) violations += 1000;
+                                if (p2.isEnglish) violations += 1000;
                             }
 
                             // Rule: dont put driver for the first day whole day 
@@ -212,12 +210,12 @@
                             const isFirstDay = (d === 1);
                             const isLastShiftOfLastDay = (d === days && slot.value === "18-24");
                             if (isFirstDay || isLastShiftOfLastDay) {
-                                if (p1.isDriver || p2.isDriver) violations += 5000; // Hard violation
+                                if (p1.isDriver || p2.isDriver) violations += 10000; 
                             }
 
                             // Normal requirement: 06:00-12:00 needs 2 drivers
                             if (slot.value === "6-12") {
-                                if (!(p1.isDriver && p2.isDriver)) violations += 2000;
+                                if (!(p1.isDriver && p2.isDriver)) violations += 5000;
                             }
 
                             if (isSequential(currentScheduleData, p1.num, p2.num)) violations += 500;
@@ -225,16 +223,16 @@
                             const sameSlotRepeats = countSameSlotRepeats(currentScheduleData, slot.label, p1.num, p2.num);
                             violations += sameSlotRepeats * 800;
 
-                            if ((dailyHistory[d][p1.num] || 0) >= 2) violations += 100;
-                            if ((dailyHistory[d][p2.num] || 0) >= 2) violations += 100;
+                            if ((dailyHistory[d][p1.num] || 0) >= 2) violations += 200;
+                            if ((dailyHistory[d][p2.num] || 0) >= 2) violations += 200;
                             
                             if (slot.isNight && !((p1.isMale && !p2.isMale) || (!p1.isMale && p2.isMale))) violations += 40;
                             if ((p1.needsEnglishPartner && !p2.canEnglish) || (p2.needsEnglishPartner && !p1.canEnglish)) violations += 30;
 
-                            // Preferred shifts logic (modified to respect the new rules)
+                            // Driver preference for late shifts (if not restricted)
                             if (slot.value !== "6-12" && !isFirstDay && !isLastShiftOfLastDay) {
                                 if (["12-18", "18-24"].includes(slot.value) && !(p1.isDriver || p2.isDriver)) {
-                                    violations += 25; 
+                                    violations += 50; 
                                 }
                             }
 
@@ -290,7 +288,6 @@
                 `;
 
                 dayData.forEach(item => {
-                    const hideEnglishLabel = item.slot.value === "12-18" || item.slot.value === "18-24";
                     dayHtml += `
                         <div class="p-4 slot-card ${item.skipped ? 'skipped' : ''}">
                             <div class="text-[10px] font-black text-slate-400 mb-3 border-b border-slate-50 pb-1 uppercase tracking-tighter">${item.slot.label}</div>
@@ -300,7 +297,7 @@
                                         <div class="flex justify-between items-center mb-1">
                                             <span class="bg-slate-100 px-1.5 py-0.5 rounded text-[10px]">${p.num}</span>
                                             <div class="flex items-center gap-1.5">
-                                                ${(p.isEnglish && !hideEnglishLabel) ? '<span class="is-english text-[10px] font-black" title="English">E</span>' : ''}
+                                                ${p.isEnglish ? '<span class="is-english text-[10px] font-black" title="English">E</span>' : ''}
                                                 <span class="${p.isMale ? 'gender-m' : 'gender-f'} text-[9px] font-black opacity-80">${p.isMale ? 'M' : 'F'}</span>
                                                 ${p.isDriver ? '<span class="is-driver text-[10px] font-black" title="Driver">D</span>' : ''}
                                             </div>
@@ -330,8 +327,7 @@
                     currentDay = item.day;
                     textContent += `\n--- DAY ${currentDay} ---\n`;
                 }
-                const hideEnglishLabel = item.slot.value === "12-18" || item.slot.value === "18-24";
-                const players = item.players.map(p => `${p.num} [${p.name}] (${p.isMale?'M':'F'}${p.isDriver?'D':''}${(p.isEnglish && !hideEnglishLabel)?'E':''})`).join(", ");
+                const players = item.players.map(p => `${p.num} [${p.name}]`).join(", ");
                 textContent += `[${item.slot.label}] : ${players || "Unassigned"}\n`;
             });
             const blob = new Blob([textContent], { type: 'text/plain' });
