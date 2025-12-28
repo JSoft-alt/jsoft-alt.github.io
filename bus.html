@@ -4,10 +4,10 @@ import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged }
 import { getFirestore, doc, setDoc, collection, onSnapshot, addDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { 
   Shield, Calendar, Trash2, Edit2, X, Cloud, RefreshCcw, Check, 
-  Settings, AlertCircle, UserPlus, Database, RotateCw, Lock 
+  Settings, UserPlus, Database, RotateCw, Lock, Clock, Languages, Car, UserCheck
 } from 'lucide-react';
 
-// Global variables provided by environment
+// --- CONFIGURATION ---
 const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
   apiKey: "AIzaSyCLKH_gbj1AG1m0q4ilHwX8QH8LkZKIfbc",
   authDomain: "syscheduler.firebaseapp.com",
@@ -20,7 +20,6 @@ const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__f
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'syscheduler-v1';
 const LOGIN_PASSWORD = "SY2026PERFORMANCE";
 
-// Constants
 const SHIFT_ORDER = ["0-3", "3-6", "6-12", "12-18", "18-24"];
 const SHIFT_DEFS = { 
   "0-3": "00:00-03:00", 
@@ -58,270 +57,216 @@ const INITIAL_ROSTER = [
   { num: 25, name: "Shunxiang Wu", isMale: true, isEnglish: false, isDriver: false, hasCar: false }
 ];
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+// --- HELPERS ---
+const Badge = ({ p }) => (
+  <div className="flex gap-1.5 mt-1.5 flex-wrap">
+    <div className={`w-2.5 h-2.5 rounded-full ${p.isMale ? 'bg-blue-400' : 'bg-pink-400'}`} title={p.isMale ? 'Male' : 'Female'}></div>
+    {p.isEnglish && <div className="w-2.5 h-2.5 rounded-full bg-indigo-500" title="English Speaker"></div>}
+    {p.isDriver && <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" title="Licensed Driver"></div>}
+    {p.hasCar && <div className="w-2.5 h-2.5 rounded-full bg-amber-400" title="Has Vehicle"></div>}
+  </div>
+);
+
+// --- MAIN COMPONENT ---
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuth, setIsAuth] = useState(false);
   const [passInput, setPassInput] = useState("");
   const [user, setUser] = useState(null);
   const [members, setMembers] = useState([]);
-  const [securityRules, setSecurityRules] = useState([]);
-  const [currentSchedule, setCurrentSchedule] = useState(null);
-  const [genStatus, setGenStatus] = useState("idle");
+  const [schedule, setSchedule] = useState({ days: [] });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
-  const [alertMsg, setAlertMsg] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-  const [endDate, setEndDate] = useState(new Date(Date.now() + 172800000).toISOString().split('T')[0]);
-  const [arrivalPeriod, setArrivalPeriod] = useState("12-18");
+  const [dateRange, setDateRange] = useState({
+    start: new Date().toISOString().split('T')[0],
+    end: new Date(Date.now() + 172800000).toISOString().split('T')[0]
+  });
 
   // Authentication Setup
   useEffect(() => {
-    const sessionAuth = localStorage.getItem('sy_auth');
-    if (sessionAuth === LOGIN_PASSWORD) setIsAuthenticated(true);
+    const saved = localStorage.getItem(`auth_${appId}`);
+    if (saved === LOGIN_PASSWORD) setIsAuth(true);
 
     const initAuth = async () => {
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
-      } catch (err) {
-        console.error("Auth failed:", err);
+      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+        await signInWithCustomToken(auth, __initial_auth_token);
+      } else {
+        await signInAnonymously(auth);
       }
     };
     initAuth();
-    const unsubscribe = onAuthStateChanged(auth, setUser);
-    return () => unsubscribe();
+    return onAuthStateChanged(auth, setUser);
   }, []);
 
-  // Data Sync - Only runs AFTER user is authenticated AND password is correct
+  // Real-time Sync
   useEffect(() => {
-    if (!user || !isAuthenticated) return;
+    if (!user || !isAuth) return;
 
     const mRef = collection(db, 'artifacts', appId, 'public', 'data', 'members');
+    const sRef = doc(db, 'artifacts', appId, 'public', 'data', 'activeSchedule', 'current');
+
     const unsubM = onSnapshot(mRef, (snap) => {
       if (snap.empty) {
+        // Initial setup if DB is empty
         INITIAL_ROSTER.forEach(m => addDoc(mRef, { ...m, inPool: true }));
       } else {
-        const data = snap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-        setMembers(data.sort((a, b) => Number(a.num) - Number(b.num)));
+        const data = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+        setMembers(data.sort((a, b) => a.num - b.num));
       }
-    }, (err) => console.error("Members sync error:", err));
-
-    const srRef = collection(db, 'artifacts', appId, 'public', 'data', 'securityRules');
-    const unsubSr = onSnapshot(srRef, (snap) => {
-      setSecurityRules(snap.docs.map(doc => ({ ...doc.data(), id: doc.id })));
-    }, (err) => console.error("Rules sync error:", err));
-
-    const scRef = collection(db, 'artifacts', appId, 'public', 'data', 'activeSchedule');
-    const unsubSc = onSnapshot(scRef, (snap) => {
-      const docData = snap.docs.find(d => d.id === "current");
-      if (docData) setCurrentSchedule({...docData.data(), id: docData.id});
-    }, (err) => console.error("Schedule sync error:", err));
-
-    return () => { unsubM(); unsubSr(); unsubSc(); };
-  }, [user, isAuthenticated]);
-
-  const handleLogin = (e) => {
-    e.preventDefault();
-    if (passInput === LOGIN_PASSWORD) {
-      setIsAuthenticated(true);
-      localStorage.setItem('sy_auth', LOGIN_PASSWORD);
-    } else {
-      setAlertMsg("Incorrect Password");
-      setTimeout(() => setAlertMsg(null), 2000);
-    }
-  };
-
-  // Business Logic
-  const calculateHistory = (allDays, pool) => {
-    const history = {};
-    pool.forEach(p => history[p.num] = 0);
-    allDays.forEach(day => {
-      [...(day.bus || []), ...(day.sec || [])].forEach(slot => {
-        slot.players.forEach(p => { if(history[p.num] !== undefined) history[p.num]++ });
-      });
-    });
-    return history;
-  };
-
-  const pickPair = (pool, time, busyList, history, options) => {
-    const { forceDoubleDriver, needsEnglish } = options;
-    const available = pool.filter(p => !busyList.includes(p.num));
-    if (available.length < 2) return [{ name: "VACANT", num: "!" }, { name: "VACANT", num: "!" }];
-
-    let best = null;
-    let minScore = Infinity;
-    for (let i = 0; i < available.length; i++) {
-      for (let j = i + 1; j < available.length; j++) {
-        const p1 = available[i]; const p2 = available[j];
-        let score = (history[p1.num] + history[p2.num]) * 1000;
-        const isNight = time.startsWith("00:") || time.startsWith("03:") || time.startsWith("18:");
-        if (isNight && !p1.isMale && !p2.isMale) score += 50000;
-        if (forceDoubleDriver && (!p1.isDriver || !p2.isDriver)) score += 30000;
-        if (needsEnglish && (!p1.isEnglish && !p2.isEnglish)) score += 100000;
-        score += Math.random() * 50;
-        if (score < minScore) { minScore = score; best = [p1, p2]; }
-      }
-    }
-    if (best) best.forEach(p => { if (p.num !== "!") history[p.num]++; });
-    return best;
-  };
-
-  const generateSingleDay = (dateISO, pool, history, isFirstDay = false) => {
-    const curDate = new Date(dateISO + "T00:00:00");
-    let dayData = { 
-      id: crypto.randomUUID(),
-      date: dateISO, 
-      dateStr: curDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }), 
-      bus: [], sec: [], busy: [] 
-    };
-    
-    securityRules.filter(s => s.date === dateISO).forEach(req => {
-      const p1 = pickPair(pool, req.timeRange, dayData.busy, history, { forceDoubleDriver: false, needsEnglish: true });
-      dayData.sec.push({ id: crypto.randomUUID(), time: req.timeRange, type: "Primary", players: p1 });
-      p1.forEach(p => dayData.busy.push(p.num));
-      const p2 = pickPair(pool, req.timeRange, dayData.busy, history, { forceDoubleDriver: false, needsEnglish: false });
-      dayData.sec.push({ id: crypto.randomUUID(), time: req.timeRange, type: "Tunnel", players: p2 });
-      p2.forEach(p => dayData.busy.push(p.num));
     });
 
-    const startKey = isFirstDay ? arrivalPeriod : "0-3";
-    SHIFT_ORDER.slice(SHIFT_ORDER.indexOf(startKey)).forEach(key => {
-      const pair = pickPair(pool, SHIFT_DEFS[key], dayData.busy, history, { forceDoubleDriver: key === "6-12", needsEnglish: false });
-      dayData.bus.push({ id: crypto.randomUUID(), time: SHIFT_DEFS[key], players: pair });
-      pair.forEach(p => dayData.busy.push(p.num));
+    const unsubS = onSnapshot(sRef, (snap) => {
+      if (snap.exists()) setSchedule(snap.data());
     });
-    return dayData;
-  };
 
-  const rerollDay = async (dayId) => {
-    if (!user) return;
+    return () => { unsubM(); unsubS(); };
+  }, [user, isAuth]);
+
+  // Scheduler Engine
+  const generateSchedule = async () => {
     const pool = members.filter(m => m.inPool);
-    const dayToReroll = currentSchedule.days.find(d => d.id === dayId);
-    if (!dayToReroll) return;
-
-    const otherDays = currentSchedule.days.filter(d => d.id !== dayId);
-    const history = calculateHistory(otherDays, pool);
-    const isFirstDay = dayId === currentSchedule.days[0].id;
+    if (pool.length < 6) return alert("Select at least 6 members in the pool.");
     
-    const newDayData = generateSingleDay(dayToReroll.date, pool, history, isFirstDay);
-    const finalDays = [...otherDays, newDayData].sort((a, b) => a.date.localeCompare(b.date));
-
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'activeSchedule', "current"), {
-      days: finalDays,
-      updatedAt: Date.now()
-    });
-  };
-
-  const generateFullSchedule = async () => {
-    if (!user) return;
-    const pool = members.filter(m => m.inPool);
-    if (pool.length < 8) { 
-      setAlertMsg("Requires 8+ personnel in pool."); 
-      setTimeout(() => setAlertMsg(null), 3000);
-      return; 
-    }
-    setGenStatus("loading");
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const dateRange = [];
+    setLoading(true);
+    const start = new Date(dateRange.start);
+    const end = new Date(dateRange.end);
+    const generatedDays = [];
+    
     let dIter = new Date(start);
     while (dIter <= end) {
-      dateRange.push(dIter.toISOString().split('T')[0]);
+      const dateISO = dIter.toISOString().split('T')[0];
+      const shuffled = [...pool].sort(() => Math.random() - 0.5);
+      let pIdx = 0;
+
+      generatedDays.push({
+        id: crypto.randomUUID(),
+        date: dateISO,
+        label: dIter.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }),
+        shifts: SHIFT_ORDER.map(key => {
+          const players = [shuffled[pIdx % shuffled.length], shuffled[(pIdx + 1) % shuffled.length]];
+          pIdx += 2;
+          return { time: SHIFT_DEFS[key], players };
+        })
+      });
       dIter.setDate(dIter.getDate() + 1);
     }
-    const existingDays = currentSchedule?.days || [];
-    const nonOverlapping = existingDays.filter(d => !dateRange.includes(d.date));
-    const history = calculateHistory(nonOverlapping, pool);
-    const newDays = dateRange.map((dateISO, idx) => generateSingleDay(dateISO, pool, history, idx === 0));
-    const finalDays = [...nonOverlapping, ...newDays].sort((a, b) => a.date.localeCompare(b.date));
 
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'activeSchedule', "current"), {
-      days: finalDays,
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'activeSchedule', 'current'), {
+      days: generatedDays,
       updatedAt: Date.now()
     });
-    setGenStatus("complete");
-    setTimeout(() => setGenStatus("idle"), 2000);
+    setLoading(false);
   };
 
-  const Badge = ({ p }) => (
-    <div className="flex gap-1 mt-1 flex-wrap">
-      <span className={`text-[8px] px-1.5 py-0.5 rounded-md font-black ${p.isMale ? 'bg-blue-600' : 'bg-pink-500'} text-white uppercase`}>{p.isMale ? 'M' : 'F'}</span>
-      {p.isEnglish && <span className="text-[8px] px-1.5 py-0.5 rounded-md font-black bg-indigo-100 text-indigo-700 uppercase">E</span>}
-      {p.isDriver && <span className="text-[8px] px-1.5 py-0.5 rounded-md font-black bg-emerald-100 text-emerald-700 uppercase">D</span>}
-    </div>
-  );
+  const handleMemberSubmit = async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const data = {
+      num: Number(formData.get('num')),
+      name: formData.get('name'),
+      isMale: formData.get('gender') === 'male',
+      isEnglish: formData.get('eng') === 'on',
+      isDriver: formData.get('drv') === 'on',
+      hasCar: formData.get('car') === 'on',
+      inPool: true
+    };
 
-  if (!isAuthenticated) {
+    if (editingMember) {
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', editingMember.id), data);
+      setEditingMember(null);
+    } else {
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'members'), data);
+    }
+    e.target.reset();
+  };
+
+  if (!isAuth) {
     return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
         <div className="bg-white p-10 rounded-[3rem] shadow-2xl w-full max-w-md text-center">
-          <div className="bg-indigo-600 w-16 h-16 rounded-3xl flex items-center justify-center mx-auto mb-6 text-white">
-            <Shield size={32} />
+          <div className="w-16 h-16 bg-indigo-600 rounded-2xl mx-auto mb-6 flex items-center justify-center text-white shadow-xl shadow-indigo-100">
+            <Lock size={32} />
           </div>
-          <h1 className="text-2xl font-black uppercase tracking-tighter mb-2">Access Portal</h1>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-8">System performance authorization</p>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="relative">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input 
-                type="password" 
-                placeholder="••••••••••••" 
-                className="w-full bg-slate-100 p-4 pl-12 rounded-2xl border-2 border-transparent focus:border-indigo-500 outline-none font-black tracking-widest text-sm transition-all"
-                value={passInput}
-                onChange={e => setPassInput(e.target.value)}
-              />
-            </div>
-            <button type="submit" className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-black transition-all shadow-xl">
-              Authenticate
-            </button>
+          <h1 className="text-2xl font-black uppercase tracking-tight mb-2">Shift Master Pro</h1>
+          <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-8">Authorization Required</p>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            if (passInput === LOGIN_PASSWORD) {
+              setIsAuth(true);
+              localStorage.setItem(`auth_${appId}`, LOGIN_PASSWORD);
+            }
+          }} className="space-y-4">
+            <input 
+              type="password" 
+              value={passInput} 
+              onChange={(e) => setPassInput(e.target.value)}
+              placeholder="Portal Password"
+              className="w-full bg-slate-100 p-4 rounded-2xl border-2 border-transparent focus:border-indigo-600 outline-none text-center font-bold"
+            />
+            <button className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-black transition-colors">Login to Ops</button>
           </form>
-          {alertMsg && <p className="mt-4 text-rose-500 text-[10px] font-black uppercase">{alertMsg}</p>}
         </div>
       </div>
     );
   }
 
-  if (!user) return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white"><Database className="animate-pulse text-indigo-400" size={48} /></div>;
-
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-[#1E293B] pb-24 font-sans">
-      <div className="max-w-7xl mx-auto p-4 lg:p-8">
-        <header className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm mb-10 flex flex-col xl:flex-row items-center justify-between gap-6">
+    <div className="min-h-screen bg-[#F8FAFC] p-4 lg:p-10 font-sans text-slate-900">
+      <div className="max-w-7xl mx-auto">
+        
+        {/* Header */}
+        <header className="flex flex-col md:flex-row justify-between items-center bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm mb-10">
           <div className="flex items-center gap-5">
-            <div className="bg-slate-900 p-4 rounded-3xl text-white"><Shield size={24} /></div>
+            <div className="bg-indigo-600 p-4 rounded-3xl text-white shadow-lg shadow-indigo-100">
+              <Shield size={28} />
+            </div>
             <div>
-              <h1 className="text-2xl font-black uppercase tracking-tighter">Shift Master <span className="text-indigo-600">Pro</span></h1>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1.5 flex items-center gap-2"><Cloud size={12} className="text-emerald-500" /> Database Live • {members.length} Personnel</p>
+              <h1 className="text-3xl font-black italic tracking-tighter uppercase leading-none">Shift Master <span className="text-indigo-600">Pro</span></h1>
+              <div className="flex items-center gap-2 mt-2">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Ops Dashboard</p>
+              </div>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2 w-full xl:w-auto">
-            <button onClick={() => setIsModalOpen(true)} className="flex-1 xl:flex-none px-6 py-3 bg-slate-100 text-slate-600 rounded-2xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-2">
-              <Settings size={18} /> Manage Personnel
+          <div className="flex gap-4 mt-6 md:mt-0">
+            <button 
+              onClick={generateSchedule}
+              disabled={loading}
+              className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-indigo-100 hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
+            >
+              {loading ? <RotateCw className="animate-spin" size={14} /> : <RefreshCcw size={14} />}
+              Compute Schedule
             </button>
-            <button onClick={generateFullSchedule} disabled={genStatus !== "idle"} className={`flex-1 xl:flex-none px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl transition-all flex items-center justify-center gap-3 min-w-[220px] ${genStatus === "complete" ? "bg-emerald-500 text-white" : genStatus === "loading" ? "bg-slate-400 text-white" : "bg-indigo-600 text-white"}`}>
-              {genStatus === "loading" ? <RefreshCcw size={18} className="animate-spin" /> : genStatus === "complete" ? <Check size={18} /> : <Calendar size={18} />}
-              {genStatus === "loading" ? "Computing..." : "Sync & Generate Schedule"}
+            <button 
+              onClick={() => setIsModalOpen(true)}
+              className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-slate-200 hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
+            >
+              <Database size={14} />
+              Registry
             </button>
           </div>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+          
+          {/* Sidebar / Controls */}
           <aside className="lg:col-span-3 space-y-8">
             <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm">
-              <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-4 border-b pb-3">Selection Pool</h3>
-              <div className="space-y-1.5 max-h-[300px] lg:max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-6 border-b pb-3">Selection Pool</h3>
+              <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                 {members.map(m => (
-                  <button key={m.id} onClick={() => updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', m.id), { inPool: !m.inPool })} className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all ${m.inPool ? 'bg-indigo-50 border-indigo-100' : 'bg-slate-50 border-transparent grayscale opacity-40'}`}>
+                  <button 
+                    key={m.id} 
+                    onClick={() => updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', m.id), { inPool: !m.inPool })}
+                    className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all ${m.inPool ? 'bg-indigo-50 border-indigo-100' : 'bg-slate-50 border-transparent grayscale opacity-40'}`}
+                  >
                     <div className="flex items-center gap-3">
-                      <span className={`text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-lg ${m.inPool ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-400'}`}>{m.num}</span>
+                      <span className={`text-[10px] font-black w-7 h-7 flex items-center justify-center rounded-lg ${m.inPool ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-400'}`}>{m.num}</span>
                       <span className="text-[11px] font-bold text-slate-700 truncate">{m.name}</span>
                     </div>
                   </button>
@@ -329,138 +274,144 @@ export default function App() {
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
-              <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-400">Date Control</h3>
+            <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm">
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Date Range</h3>
               <div className="space-y-4">
-                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full bg-slate-50 p-3 rounded-xl text-xs font-black ring-1 ring-slate-100" />
-                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full bg-slate-50 p-3 rounded-xl text-xs font-black ring-1 ring-slate-100" />
-                <div className="pt-4 border-t border-slate-100">
-                   <h4 className="text-[10px] font-black text-indigo-600 uppercase mb-3">Security Rules</h4>
-                   <div className="space-y-2">
-                    <input type="date" id="secDate" className="w-full bg-slate-50 p-2.5 rounded-xl text-xs font-black ring-1 ring-slate-100" defaultValue={startDate} />
-                    <div className="grid grid-cols-2 gap-2"><input type="time" id="secStart" className="bg-slate-50 p-2.5 rounded-xl text-xs font-black" defaultValue="08:00" /><input type="time" id="secEnd" className="bg-slate-50 p-2.5 rounded-xl text-xs font-black" defaultValue="16:00" /></div>
-                    <button onClick={async () => { 
-                      const d = document.getElementById('secDate').value;
-                      const s = document.getElementById('secStart').value;
-                      const e = document.getElementById('secEnd').value;
-                      if (!d || !s || !e) return;
-                      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'securityRules'), { date: d, timeRange: `${s}-${e}` }); 
-                    }} className="w-full bg-slate-900 text-white py-2.5 rounded-xl text-[9px] font-black uppercase">Add Rule</button>
-                   </div>
-                </div>
-                {securityRules.map(s => (
-                  <div key={s.id} className="bg-slate-50 p-2 rounded-lg flex justify-between items-center text-[9px] font-black text-slate-500">
-                    <span>{s.date} • {s.timeRange}</span>
-                    <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'securityRules', s.id))} className="text-rose-400"><Trash2 size={12} /></button>
-                  </div>
-                ))}
+                <input 
+                  type="date" 
+                  value={dateRange.start} 
+                  onChange={e => setDateRange({...dateRange, start: e.target.value})} 
+                  className="w-full bg-slate-50 p-3 rounded-xl font-bold text-xs outline-none ring-1 ring-slate-100" 
+                />
+                <input 
+                  type="date" 
+                  value={dateRange.end} 
+                  onChange={e => setDateRange({...dateRange, end: e.target.value})} 
+                  className="w-full bg-slate-50 p-3 rounded-xl font-bold text-xs outline-none ring-1 ring-slate-100" 
+                />
               </div>
             </div>
           </aside>
 
-          <main className="lg:col-span-9 space-y-10">
-            {currentSchedule?.days?.length > 0 ? currentSchedule.days.map((day) => (
-              <div key={day.id} className="bg-white rounded-[2.5rem] border border-slate-200 overflow-hidden shadow-sm">
+          {/* Main Feed */}
+          <main className="lg:col-span-9 space-y-8">
+            {schedule.days.length > 0 ? schedule.days.map((day) => (
+              <div key={day.id} className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden">
                 <div className="bg-slate-900 px-8 py-5 flex justify-between items-center text-white">
-                  <h4 className="text-sm font-black uppercase tracking-wider">{day.dateStr}</h4>
-                  <div className="flex gap-2">
-                    <button onClick={() => rerollDay(day.id)} className="flex items-center gap-2 bg-white/10 hover:bg-white/20 px-4 py-1.5 rounded-full text-[10px] font-black uppercase transition-colors">
-                      <RotateCw size={14} /> Reroll Day
-                    </button>
-                    <button onClick={async () => { const newDays = currentSchedule.days.filter(d => d.id !== day.id); await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'activeSchedule', "current"), { days: newDays }); }} className="text-white/20 hover:text-rose-400 p-2"><Trash2 size={18} /></button>
+                  <div className="flex items-center gap-4">
+                    <Calendar size={18} className="text-indigo-400" />
+                    <h2 className="text-sm font-black uppercase tracking-widest">{day.label}</h2>
                   </div>
+                  <button 
+                    onClick={async () => {
+                      const updated = schedule.days.filter(d => d.id !== day.id);
+                      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'activeSchedule', 'current'), { ...schedule, days: updated });
+                    }}
+                    className="p-2 text-white/20 hover:text-rose-500 transition-colors"
+                  >
+                    <Trash2 size={18} />
+                  </button>
                 </div>
-                <div className="p-8 space-y-8">
-                  {day.sec?.length > 0 && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {day.sec.map((slot) => (
-                        <div key={slot.id} className={`p-4 rounded-3xl border ${slot.type === "Primary" ? 'bg-indigo-50/50 border-indigo-100' : 'bg-slate-50 border-slate-100'}`}>
-                          <div className="flex justify-between items-center mb-3"><span className="text-[11px] font-black">{slot.time}</span><span className="text-[8px] font-black bg-slate-900 text-white px-2 py-0.5 rounded-full">{slot.type}</span></div>
-                          <div className="grid grid-cols-2 gap-3">{slot.players.map((p, idx) => (<div key={idx} className="bg-white p-3 rounded-2xl border border-slate-100 text-[10px] font-black truncate">{p.name}</div>))}</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-                    {day.bus.map((slot) => (
-                      <div key={slot.id} className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                        <span className="text-[10px] font-black text-indigo-600 block mb-3 border-b pb-1">{slot.time}</span>
-                        <div className="space-y-2">{slot.players.map((p, idx) => (<div key={idx} className="bg-white p-2 rounded-xl border border-slate-100 text-[10px] font-bold truncate">{p.name}</div>))}</div>
+                <div className="p-8 grid grid-cols-1 md:grid-cols-5 gap-4">
+                  {day.shifts.map((shift, idx) => (
+                    <div key={idx} className="bg-slate-50 p-4 rounded-3xl border border-slate-100 group hover:bg-white hover:border-indigo-100 transition-all">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Clock size={12} className="text-indigo-500" />
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{shift.time}</span>
                       </div>
-                    ))}
-                  </div>
+                      <div className="space-y-4">
+                        {shift.players.map((p, pidx) => (
+                          <div key={pidx}>
+                            <p className="text-[11px] font-black uppercase text-slate-800 tracking-tight leading-none truncate">{p.name}</p>
+                            <Badge p={p} />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )) : (
-              <div className="bg-white rounded-[2.5rem] border border-slate-200 p-20 text-center">
+              <div className="bg-white rounded-[3rem] border-2 border-dashed border-slate-200 p-20 text-center">
                 <Calendar className="mx-auto text-slate-200 mb-6" size={64} />
-                <p className="text-slate-400 text-xs font-black uppercase tracking-widest">No active schedule found. Use the sync button above.</p>
+                <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">No active schedule found</p>
               </div>
             )}
           </main>
         </div>
       </div>
 
+      {/* Database Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 lg:p-10 bg-slate-900/90 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-6xl h-full lg:max-h-[85vh] rounded-[2rem] lg:rounded-[3rem] overflow-hidden flex flex-col shadow-2xl">
-            <div className="p-6 bg-slate-900 text-white flex justify-between items-center shrink-0">
-              <h2 className="text-xl font-black uppercase tracking-tighter">Database Personnel</h2>
-              <button onClick={() => { setIsModalOpen(false); setEditingMember(null); }} className="p-2 hover:bg-white/10 rounded-xl transition-colors"><X /></button>
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xl flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-6xl h-[85vh] rounded-[3.5rem] shadow-2xl flex flex-col overflow-hidden">
+            <div className="p-8 bg-slate-900 text-white flex justify-between items-center">
+              <div className="flex items-center gap-4">
+                <Database className="text-indigo-400" />
+                <h2 className="text-xl font-black uppercase tracking-tight">Personnel Registry</h2>
+              </div>
+              <button onClick={() => { setIsModalOpen(false); setEditingMember(null); }} className="p-2 hover:bg-white/10 rounded-xl">
+                <X size={24} />
+              </button>
             </div>
 
-            <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-              <div className="w-full lg:w-[380px] p-6 lg:p-8 border-b lg:border-b-0 lg:border-r border-slate-100 bg-slate-50/50 overflow-y-auto shrink-0">
-                <h3 className="text-[10px] font-black text-indigo-600 uppercase mb-6 flex items-center gap-2"><UserPlus size={16} /> {editingMember ? 'Update Profile' : 'New Enrollment'}</h3>
-                <form onSubmit={async (e) => {
-                  e.preventDefault();
-                  const f = e.target;
-                  const data = { 
-                    num: Number(f.num.value), name: f.name.value, 
-                    isMale: f.gender.value === "male", isEnglish: f.english.checked, 
-                    isDriver: f.driver.checked, hasCar: f.car.checked, 
-                    inPool: editingMember ? editingMember.inPool : true 
-                  };
-                  if (editingMember) { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', editingMember.id), data); setEditingMember(null); }
-                  else { await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'members'), data); }
-                  f.reset();
-                }} className="space-y-4">
-                  <div className="grid grid-cols-3 gap-3">
-                    <input name="num" defaultValue={editingMember?.num} className="p-3 rounded-xl border-2 border-slate-200 text-xs font-black focus:border-indigo-500 outline-none" placeholder="ID" required />
-                    <input name="name" defaultValue={editingMember?.name} className="col-span-2 p-3 rounded-xl border-2 border-slate-200 text-xs font-black focus:border-indigo-500 outline-none" placeholder="Name" required />
+            <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+              <div className="w-full md:w-[400px] p-8 bg-slate-50 border-r border-slate-100 overflow-y-auto">
+                <form onSubmit={handleMemberSubmit} className="space-y-6">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="col-span-1">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">ID</label>
+                      <input name="num" type="number" defaultValue={editingMember?.num} required className="w-full p-4 rounded-2xl outline-none font-bold" />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Name</label>
+                      <input name="name" type="text" defaultValue={editingMember?.name} required className="w-full p-4 rounded-2xl outline-none font-bold" />
+                    </div>
                   </div>
-                  <select name="gender" defaultValue={editingMember?.isMale ? "male" : "female"} className="w-full p-3 rounded-xl border-2 border-slate-200 text-xs font-black bg-white focus:border-indigo-500 outline-none">
+
+                  <select name="gender" defaultValue={editingMember?.isMale ? 'male' : 'female'} className="w-full p-4 rounded-2xl outline-none font-bold">
                     <option value="female">Female</option>
                     <option value="male">Male</option>
                   </select>
-                  <div className="grid grid-cols-2 gap-3">
-                    <label className="flex items-center gap-2 p-3 bg-white rounded-xl border-2 border-slate-200 cursor-pointer text-[10px] font-black uppercase">
-                      <input type="checkbox" name="english" defaultChecked={editingMember?.isEnglish} className="accent-indigo-600" /> English
-                    </label>
-                    <label className="flex items-center gap-2 p-3 bg-white rounded-xl border-2 border-slate-200 cursor-pointer text-[10px] font-black uppercase">
-                      <input type="checkbox" name="driver" defaultChecked={editingMember?.isDriver} className="accent-emerald-600" /> Driver
-                    </label>
+
+                  <div className="grid grid-cols-1 gap-3">
+                    {[
+                      { id: 'eng', label: 'English Speaker', icon: <Languages size={14} /> },
+                      { id: 'drv', label: 'Licensed Driver', icon: <Car size={14} /> },
+                      { id: 'car', label: 'Has Vehicle', icon: <UserCheck size={14} /> }
+                    ].map(item => (
+                      <label key={item.id} className="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-100 cursor-pointer hover:border-indigo-200 transition-all">
+                        <div className="flex items-center gap-3">
+                          <span className="text-indigo-500">{item.icon}</span>
+                          <span className="text-[10px] font-black uppercase tracking-widest">{item.label}</span>
+                        </div>
+                        <input type="checkbox" name={item.id} defaultChecked={editingMember?.[item.id === 'eng' ? 'isEnglish' : item.id === 'drv' ? 'isDriver' : 'hasCar']} className="w-5 h-5 accent-indigo-600 rounded" />
+                      </label>
+                    ))}
                   </div>
-                  <button type="submit" className="w-full bg-indigo-600 text-white py-4 rounded-xl text-[10px] font-black uppercase shadow-lg hover:bg-indigo-700 transition-colors">
-                    {editingMember ? 'Apply Changes' : 'Enroll Personnel'}
+
+                  <button className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-black transition-all">
+                    {editingMember ? 'Update Profile' : 'Enlist Personnel'}
                   </button>
                 </form>
               </div>
 
-              <div className="flex-1 p-6 lg:p-8 overflow-y-auto custom-scrollbar bg-white">
+              <div className="flex-1 p-8 overflow-y-auto custom-scrollbar bg-white">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {members.map(m => (
-                    <div key={m.id} className="p-4 rounded-2xl border border-slate-100 bg-slate-50 flex justify-between items-center hover:border-indigo-100 transition-all">
+                    <div key={m.id} className="p-5 rounded-[2rem] bg-slate-50 border border-slate-100 flex justify-between items-center group hover:bg-white hover:border-indigo-100 transition-all">
                       <div className="flex items-center gap-4">
-                        <span className="text-[10px] font-black w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0">{m.num}</span>
-                        <div className="min-w-0">
-                          <p className="text-[11px] font-black text-slate-800 truncate">{m.name}</p>
+                        <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black text-xs">
+                          {m.num}
+                        </div>
+                        <div>
+                          <p className="text-[11px] font-black text-slate-800 uppercase">{m.name}</p>
                           <Badge p={m} />
                         </div>
                       </div>
-                      <div className="flex gap-1">
-                        <button onClick={() => setEditingMember(m)} className="p-2 text-indigo-600 hover:bg-white rounded-lg"><Edit2 size={16} /></button>
-                        <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', m.id))} className="p-2 text-rose-600 hover:bg-white rounded-lg"><Trash2 size={16} /></button>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => setEditingMember(m)} className="p-3 text-indigo-600 hover:bg-indigo-50 rounded-xl"><Edit2 size={16} /></button>
+                        <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', m.id))} className="p-3 text-rose-600 hover:bg-rose-50 rounded-xl"><Trash2 size={16} /></button>
                       </div>
                     </div>
                   ))}
@@ -470,11 +421,10 @@ export default function App() {
           </div>
         </div>
       )}
-      
+
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
       `}</style>
     </div>
   );
