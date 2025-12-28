@@ -8,8 +8,6 @@
     <style>
         body { background-color: #f8fafc; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
         .card { background: white; border-radius: 1rem; box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1); border: 1px solid #e2e8f0; }
-        .slot-card { min-height: 120px; transition: all 0.2s; border: 1px solid transparent; position: relative; }
-        .slot-card:hover { border-color: #6366f1; background-color: #f8fafc; }
         
         .member-item { cursor: pointer; transition: all 0.2s; border: 2px solid transparent; }
         .member-item.inactive { opacity: 0.4; filter: grayscale(1); }
@@ -18,21 +16,18 @@
         .badge { font-size: 8px; font-weight: 800; padding: 2px 4px; border-radius: 4px; text-transform: uppercase; }
         .badge-m { background-color: #dbeafe; color: #1e40af; }
         .badge-f { background-color: #fce7f3; color: #9d174d; }
-        .badge-e { background-color: #f3e8ff; color: #6b21a8; }
         .badge-d { background-color: #dcfce7; color: #166534; }
         .badge-c { background-color: #fef9c3; color: #854d0e; }
+        .badge-sec { background-color: #e0e7ff; color: #4338ca; }
         
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
 
         .time-pill { cursor: pointer; user-select: none; transition: all 0.2s; border: 1px solid #e2e8f0; }
         .time-pill.selected { background-color: #6366f1; color: white; border-color: #6366f1; }
-        
-        .reroll-btn { opacity: 0; transition: opacity 0.2s; }
-        .slot-card:hover .reroll-btn { opacity: 1; }
-        
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .animate-spin-once { animation: spin 0.5s ease-in-out; }
+
+        input, select { outline: none; transition: border-color 0.2s; }
+        input:focus, select:focus { border-color: #6366f1; }
     </style>
 </head>
 <body class="p-4 md:p-8 text-slate-900">
@@ -45,7 +40,7 @@
                 </div>
                 <div>
                     <h1 class="text-3xl font-black text-slate-900 tracking-tight uppercase">Shift Master</h1>
-                    <p class="text-slate-500 text-sm font-medium italic">Team Rotation & Arrival Management</p>
+                    <p class="text-slate-500 text-sm font-medium italic">Team Rotation & Custom Security Planner</p>
                 </div>
             </div>
             <div class="flex gap-2">
@@ -57,27 +52,24 @@
         <div class="grid grid-cols-1 xl:grid-cols-12 gap-8">
             <!-- Sidebar -->
             <aside class="xl:col-span-4 space-y-6">
+                <!-- Job Configuration -->
                 <div class="card p-6 border-indigo-100">
-                    <div class="flex justify-between items-center mb-6 border-b pb-4">
-                        <h2 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Config</h2>
-                        <button onclick="generateFullSchedule()" class="text-[9px] font-bold text-indigo-600 uppercase hover:underline">Reroll All</button>
-                    </div>
+                    <h2 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 border-b pb-2">Job Configuration</h2>
                     
                     <div class="grid grid-cols-2 gap-4 mb-6">
                         <div>
                             <label class="block text-[10px] font-bold text-slate-500 mb-1 uppercase">Start Date</label>
-                            <input type="date" id="startDate" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-[11px] outline-none">
+                            <input type="date" id="startDate" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-[11px]">
                         </div>
                         <div>
                             <label class="block text-[10px] font-bold text-slate-500 mb-1 uppercase">End Date</label>
-                            <input type="date" id="endDate" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-[11px] outline-none">
+                            <input type="date" id="endDate" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-[11px]">
                         </div>
                     </div>
 
-                    <!-- Arrival Section -->
-                    <div class="mb-6 p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100">
-                        <h3 class="text-xs font-black text-indigo-900 uppercase mb-3">Day 1 Arrival Period</h3>
-                        <div id="busPeriods" class="grid grid-cols-3 gap-1.5">
+                    <div class="p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                        <h3 class="text-xs font-black text-amber-900 uppercase mb-1">Day 1 Arrival Period</h3>
+                        <div id="arrivalPeriod" class="grid grid-cols-3 gap-1.5">
                             <div data-period="0-3" class="time-pill px-2 py-1.5 rounded-lg text-center text-[10px] font-bold bg-white">0-3</div>
                             <div data-period="3-6" class="time-pill px-2 py-1.5 rounded-lg text-center text-[10px] font-bold bg-white">3-6</div>
                             <div data-period="6-12" class="time-pill px-2 py-1.5 rounded-lg text-center text-[10px] font-bold bg-white">6-12</div>
@@ -85,26 +77,38 @@
                             <div data-period="18-24" class="time-pill px-2 py-1.5 rounded-lg text-center text-[10px] font-bold bg-white">18-24</div>
                         </div>
                     </div>
-
-                    <!-- Security Performance Section -->
-                    <div class="mb-6 p-4 bg-slate-50 rounded-2xl border border-slate-200">
-                        <h3 class="text-xs font-black text-slate-900 uppercase mb-3">Security Shifts</h3>
-                        <div id="securityPeriods" class="grid grid-cols-3 gap-1.5">
-                            <div data-period="0-3" class="time-pill px-2 py-1.5 rounded-lg text-center text-[10px] font-bold bg-white">0-3</div>
-                            <div data-period="3-6" class="time-pill px-2 py-1.5 rounded-lg text-center text-[10px] font-bold bg-white">3-6</div>
-                            <div data-period="6-12" class="time-pill px-2 py-1.5 rounded-lg text-center text-[10px] font-bold bg-white">6-12</div>
-                            <div data-period="12-18" class="time-pill selected px-2 py-1.5 rounded-lg text-center text-[10px] font-bold bg-white">12-18</div>
-                            <div data-period="18-24" class="time-pill selected px-2 py-1.5 rounded-lg text-center text-[10px] font-bold bg-white">18-24</div>
-                        </div>
-                    </div>
                 </div>
 
+                <!-- Manual Security Planner -->
+                <div class="card p-6 border-blue-100 bg-blue-50/30">
+                    <h2 class="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] mb-4 border-b pb-2">Manual Shift Planner</h2>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-[9px] font-bold text-slate-500 mb-1 uppercase">Date</label>
+                            <input type="date" id="secDate" class="w-full p-2 bg-white border border-slate-200 rounded-lg text-[10px] font-bold">
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[9px] font-bold text-slate-500 mb-1 uppercase">Start</label>
+                                <input type="time" id="secStart" class="w-full p-2 bg-white border border-slate-200 rounded-lg text-[10px] font-bold">
+                            </div>
+                            <div>
+                                <label class="block text-[9px] font-bold text-slate-500 mb-1 uppercase">End</label>
+                                <input type="time" id="secEnd" class="w-full p-2 bg-white border border-slate-200 rounded-lg text-[10px] font-bold">
+                            </div>
+                        </div>
+                        <button id="addSecBtn" class="w-full bg-blue-600 text-white py-2 rounded-xl text-[10px] font-black uppercase hover:bg-blue-700 shadow-md">Add Planned Shift</button>
+                    </div>
+                    <div id="plannedSecList" class="mt-6 space-y-2 max-h-[200px] overflow-y-auto custom-scrollbar pr-2"></div>
+                </div>
+
+                <!-- Active Staff Panel -->
                 <div class="card p-6">
                     <div class="flex items-center justify-between mb-4">
                         <h2 class="text-xs font-black text-slate-400 uppercase tracking-widest">Active Staff</h2>
                         <span id="memberCounter" class="bg-indigo-100 text-indigo-700 text-[10px] px-2 py-0.5 rounded-full font-black">0</span>
                     </div>
-                    <div id="selectionList" class="space-y-2 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar"></div>
+                    <div id="selectionList" class="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar"></div>
                 </div>
             </aside>
 
@@ -112,150 +116,219 @@
             <main class="xl:col-span-8">
                 <div id="scheduleContainer" class="space-y-8 pb-24">
                     <div class="card p-24 text-center border-dashed border-2 flex flex-col items-center justify-center text-slate-300">
-                        <p class="font-bold uppercase tracking-[0.2em] text-xs">Set range and click generate</p>
+                        <p class="font-bold uppercase tracking-[0.2em] text-xs">Configure job dates and planning to begin</p>
                     </div>
                 </div>
             </main>
         </div>
     </div>
 
-    <!-- MODAL: Team Database -->
+    <!-- Team Database Modal -->
     <div id="settingsModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-3xl w-full max-w-6xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-            <div class="bg-slate-900 p-6 text-white flex justify-between items-center shrink-0">
-                <div class="flex items-center gap-4">
+            <div class="bg-slate-900 p-6 text-white flex justify-between items-center">
+                <div class="flex items-center gap-3">
                     <h3 class="text-xl font-bold uppercase tracking-tight">Team Database</h3>
-                    <button onclick="showMemberEditor()" class="bg-indigo-500 hover:bg-indigo-400 text-white px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-colors">+ Add New Member</button>
+                    <span class="text-[10px] bg-indigo-500 text-white px-2 py-1 rounded font-black uppercase">Admin Mode</span>
                 </div>
-                <button onclick="closeSettings()" class="hover:bg-slate-700 p-2 rounded-lg">
+                <button onclick="closeSettings()" class="hover:bg-slate-700 p-2 rounded-lg transition-colors">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
             </div>
+            
+            <!-- Quick Add Row -->
+            <div class="bg-indigo-50 p-4 border-b border-indigo-100">
+                <div class="max-w-4xl mx-auto flex flex-wrap items-center gap-3">
+                    <input type="text" id="newMemberName" placeholder="Staff Name" class="flex-1 min-w-[150px] p-2 rounded-lg border border-indigo-200 text-sm font-bold">
+                    <select id="newMemberGender" class="p-2 rounded-lg border border-indigo-200 text-sm font-bold">
+                        <option value="false">Female</option>
+                        <option value="true">Male</option>
+                    </select>
+                    <div class="flex gap-4">
+                        <label class="flex items-center gap-2 text-xs font-black text-indigo-700"><input type="checkbox" id="newMemberDriver"> DRIVER</label>
+                        <label class="flex items-center gap-2 text-xs font-black text-indigo-700"><input type="checkbox" id="newMemberCar"> CAR</label>
+                    </div>
+                    <button id="addMemberBtn" class="bg-indigo-600 text-white px-6 py-2 rounded-lg text-xs font-black uppercase hover:bg-indigo-700 shadow-sm transition-all">Add Staff</button>
+                </div>
+            </div>
+
             <div class="p-6 overflow-y-auto custom-scrollbar flex-1 bg-slate-50">
                 <table class="w-full text-left border-collapse">
-                    <thead class="bg-white border-b text-slate-400 uppercase font-black text-[9px] sticky top-0 z-10">
+                    <thead class="bg-white border-b text-slate-400 uppercase font-black text-[9px] sticky top-0 z-10 shadow-sm">
                         <tr>
-                            <th class="px-4 py-3">ID</th>
+                            <th class="px-4 py-3 w-16 text-center">ID</th>
                             <th class="px-4 py-3">Full Name</th>
                             <th class="px-4 py-3 text-center">Gender</th>
-                            <th class="px-4 py-3 text-center">English</th>
-                            <th class="px-4 py-3 text-center">Driver</th>
-                            <th class="px-4 py-3 text-center">Car</th>
-                            <th class="px-4 py-3 text-right">Action</th>
+                            <th class="px-4 py-3 text-center w-24">Driver</th>
+                            <th class="px-4 py-3 text-center w-24">Vehicle</th>
+                            <th class="px-4 py-3 text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="masterTableBody" class="divide-y divide-slate-100 bg-white"></tbody>
                 </table>
-            </div>
-            <div class="p-4 bg-white border-t flex justify-end">
-                <button onclick="closeSettings()" class="px-10 py-2.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-all">Close</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL: Member Editor -->
-    <div id="editorModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm hidden z-[60] flex items-center justify-center p-4">
-        <div class="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl">
-            <h3 id="editorTitle" class="text-xl font-black uppercase mb-6 text-slate-900">Add Team Member</h3>
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Full Name</label>
-                    <input type="text" id="editName" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold">
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Gender</label>
-                        <select id="editGender" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold">
-                            <option value="false">Female</option>
-                            <option value="true">Male</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">ID Number</label>
-                        <input type="text" id="editId" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold">
-                    </div>
-                </div>
-                <div class="space-y-2 pt-2">
-                    <label class="flex items-center gap-3 cursor-pointer">
-                        <input type="checkbox" id="editEnglish" class="w-5 h-5 accent-indigo-600">
-                        <span class="text-xs font-bold text-slate-700">English Speaker</span>
-                    </label>
-                    <label class="flex items-center gap-3 cursor-pointer">
-                        <input type="checkbox" id="editDriver" class="w-5 h-5 accent-indigo-600">
-                        <span class="text-xs font-bold text-slate-700">Driver License</span>
-                    </label>
-                    <label class="flex items-center gap-3 cursor-pointer">
-                        <input type="checkbox" id="editCar" class="w-5 h-5 accent-indigo-600">
-                        <span class="text-xs font-bold text-slate-700">Has Own Car</span>
-                    </label>
-                </div>
-            </div>
-            <div class="flex gap-3 mt-8">
-                <button onclick="closeEditor()" class="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-all uppercase text-xs">Cancel</button>
-                <button onclick="saveMember()" class="flex-2 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all uppercase text-xs px-8">Save Member</button>
             </div>
         </div>
     </div>
 
     <script>
         let members = [
-            { num: "1", name: "Qing Wang", isMale: false, isEnglish: true, isDriver: true, hasCar: true, active: true },
-            { num: "2", name: "Hao Wang (Diana)", isMale: false, isEnglish: true, isDriver: false, hasCar: false, active: true },
-            { num: "3", name: "Ling Young", isMale: false, isEnglish: true, isDriver: true, hasCar: false, active: true },
-            { num: "4", name: "Ma Lan (Sophia Li)", isMale: false, isEnglish: true, isDriver: true, hasCar: true, active: true },
-            { num: "5", name: "Tham Nguyen (Mina)", isMale: false, isEnglish: true, isDriver: true, hasCar: false, active: true },
-            { num: "6", name: "Qing Han", isMale: false, isEnglish: true, isDriver: true, hasCar: false, active: true },
-            { num: "7", name: "Le Thi Oanh (Aria)", isMale: false, isEnglish: true, isDriver: false, hasCar: false, active: true },
-            { num: "8", name: "Li Han", isMale: false, isEnglish: false, isDriver: false, hasCar: false, active: true },
-            { num: "9", name: "Ping Jiang", isMale: false, isEnglish: false, isDriver: true, hasCar: false, active: true },
-            { num: "10", name: "Hongjun Zheng (Lucinda)", isMale: false, isEnglish: false, isDriver: false, hasCar: false, active: true },
-            { num: "11", name: "Dongxia Sun", isMale: false, isEnglish: false, isDriver: true, hasCar: false, active: true },
-            { num: "12", name: "Xuemei Song (Sophie)", isMale: false, isEnglish: false, isDriver: false, hasCar: false, active: true },
-            { num: "13", name: "Deyun Xia", isMale: false, isEnglish: false, isDriver: false, hasCar: false, active: true },
-            { num: "14", name: "Lily Jia", isMale: false, isEnglish: true, isDriver: true, hasCar: true, active: true },
-            { num: "15", name: "Tuyet Nhung (Adela)", isMale: false, isEnglish: true, isDriver: true, hasCar: false, active: true },
-            { num: "16", name: "Thi Lien Huong (Lotus)", isMale: false, isEnglish: true, isDriver: true, hasCar: false, active: true },
-            { num: "17", name: "Ling Wu (Cassie)", isMale: false, isEnglish: true, isDriver: true, hasCar: false, active: true },
-            { num: "18", name: "Yongxian Li (Lynna)", isMale: false, isEnglish: true, isDriver: true, hasCar: true, active: true },
-            { num: "19", name: "Xiaodong Xu (William)", isMale: true, isEnglish: true, isDriver: true, hasCar: true, active: true },
-            { num: "20", name: "Larrison Manygoats", isMale: true, isEnglish: true, isDriver: true, hasCar: true, active: true },
-            { num: "21", name: "Zhiyuan Xie (Harry)", isMale: true, isEnglish: true, isDriver: true, hasCar: true, active: true },
-            { num: "22", name: "xiaoxiao", isMale: true, isEnglish: true, isDriver: false, hasCar: false, active: true },
-            { num: "23", name: "Cong Nguyen (Charles)", isMale: true, isEnglish: true, isDriver: false, hasCar: false, active: true },
-            { num: "24", name: "Jincheng Guo (Eric)", isMale: true, isEnglish: true, isDriver: false, hasCar: false, active: true },
-            { num: "25", name: "Shunxiang Wu", isMale: true, isEnglish: false, isDriver: false, hasCar: false, active: true }
+            { num: "1", name: "Qing Wang", isMale: false, isDriver: true, hasCar: true, active: true },
+            { num: "2", name: "Hao Wang (Diana)", isMale: false, isDriver: false, hasCar: false, active: true },
+            { num: "3", name: "Ling Young", isMale: false, isDriver: true, hasCar: false, active: true },
+            { num: "4", name: "Ma Lan (Sophia Li)", isMale: false, isDriver: true, hasCar: true, active: true },
+            { num: "5", name: "Tham Nguyen (Mina)", isMale: false, isDriver: true, hasCar: false, active: true },
+            { num: "6", name: "Qing Han", isMale: false, isDriver: true, hasCar: false, active: true },
+            { num: "7", name: "Le Thi Oanh (Aria)", isMale: false, isDriver: false, hasCar: false, active: true },
+            { num: "8", name: "Li Han", isMale: false, isDriver: false, hasCar: false, active: true },
+            { num: "9", name: "Ping Jiang", isMale: false, isDriver: true, hasCar: false, active: true },
+            { num: "10", name: "Hongjun Zheng (Lucinda)", isMale: false, isDriver: false, hasCar: false, active: true },
+            { num: "11", name: "Dongxia Sun", isMale: false, isDriver: true, hasCar: false, active: true },
+            { num: "12", name: "Xuemei Song (Sophie)", isMale: false, isDriver: false, hasCar: false, active: true },
+            { num: "13", name: "Deyun Xia", isMale: false, isDriver: false, hasCar: false, active: true },
+            { num: "14", name: "Lily Jia", isMale: false, isDriver: true, hasCar: true, active: true },
+            { num: "15", name: "Tuyet Nhung (Adela)", isMale: false, isDriver: true, hasCar: false, active: true },
+            { num: "16", name: "Thi Lien Huong (Lotus)", isMale: false, isDriver: true, hasCar: false, active: true },
+            { num: "17", name: "Ling Wu (Cassie)", isMale: false, isDriver: true, hasCar: false, active: true },
+            { num: "18", name: "Yongxian Li (Lynna)", isMale: false, isDriver: true, hasCar: true, active: true },
+            { num: "19", name: "Xiaodong Xu (William)", isMale: true, isDriver: true, hasCar: true, active: true },
+            { num: "20", name: "Larrison Manygoats", isMale: true, isDriver: true, hasCar: true, active: true },
+            { num: "21", name: "Zhiyuan Xie (Harry)", isMale: true, isDriver: true, hasCar: true, active: true },
+            { num: "22", name: "xiaoxiao", isMale: true, isDriver: false, hasCar: false, active: true },
+            { num: "23", name: "Cong Nguyen (Charles)", isMale: true, isDriver: false, hasCar: false, active: true },
+            { num: "24", name: "Jincheng Guo (Eric)", isMale: true, isDriver: false, hasCar: false, active: true },
+            { num: "25", name: "Shunxiang Wu", isMale: true, isDriver: false, hasCar: false, active: true }
         ];
 
+        const SHIFT_ORDER = ["0-3", "3-6", "6-12", "12-18", "18-24"];
         const SHIFT_DEFS = { "0-3": "00:00-03:00", "3-6": "03:00-06:00", "6-12": "06:00-12:00", "12-18": "12:00-18:00", "18-24": "18:00-00:00" };
-        let currentSchedule = []; 
+        
+        let plannedSecurity = [];
         let historyGlobal = {};
-        let editingIndex = -1;
+        let editingId = null;
 
         function init() {
             const today = new Date();
             const end = new Date(today); end.setDate(today.getDate() + 4);
+            
             document.getElementById('startDate').valueAsDate = today;
             document.getElementById('endDate').valueAsDate = end;
+            document.getElementById('secDate').valueAsDate = today;
+
+            const updateDateLimits = () => {
+                const start = document.getElementById('startDate').value;
+                const end = document.getElementById('endDate').value;
+                document.getElementById('secDate').min = start;
+                document.getElementById('secDate').max = end;
+                plannedSecurity = plannedSecurity.filter(s => s.date >= start && s.date <= end);
+                renderPlannedList();
+            };
+
+            document.getElementById('startDate').addEventListener('change', updateDateLimits);
+            document.getElementById('endDate').addEventListener('change', updateDateLimits);
+            updateDateLimits();
+            
             renderSelectionPanel();
             document.getElementById('openSettingsBtn').addEventListener('click', openSettings);
             document.getElementById('generateBtn').addEventListener('click', generateFullSchedule);
-            document.querySelectorAll('#busPeriods .time-pill').forEach(pill => {
+            document.getElementById('addSecBtn').addEventListener('click', addPlannedShift);
+            document.getElementById('addMemberBtn').addEventListener('click', addNewMember);
+            
+            document.querySelectorAll('#arrivalPeriod .time-pill').forEach(pill => {
                 pill.addEventListener('click', () => {
-                    document.querySelectorAll('#busPeriods .time-pill').forEach(p => p.classList.remove('selected'));
+                    document.querySelectorAll('#arrivalPeriod .time-pill').forEach(p => p.classList.remove('selected'));
                     pill.classList.add('selected');
                 });
             });
-            document.querySelectorAll('#securityPeriods .time-pill').forEach(pill => {
-                pill.addEventListener('click', () => pill.classList.toggle('selected'));
+        }
+
+        function addNewMember() {
+            const name = document.getElementById('newMemberName').value.trim();
+            if (!name) return;
+            const newId = members.length > 0 ? (Math.max(...members.map(m => parseInt(m.num))) + 1).toString() : "1";
+            members.push({
+                num: newId,
+                name: name,
+                isMale: document.getElementById('newMemberGender').value === "true",
+                isDriver: document.getElementById('newMemberDriver').checked,
+                hasCar: document.getElementById('newMemberCar').checked,
+                active: true
             });
+            document.getElementById('newMemberName').value = "";
+            renderMasterTable();
+            renderSelectionPanel();
+        }
+
+        function deleteMember(num) {
+            members = members.filter(m => m.num !== num);
+            renderMasterTable();
+            renderSelectionPanel();
+        }
+
+        function startEdit(num) { editingId = num; renderMasterTable(); }
+
+        function saveEdit(num) {
+            const row = document.querySelector(`tr[data-id="${num}"]`);
+            const idx = members.findIndex(m => m.num === num);
+            members[idx].name = row.querySelector('.edit-name').value;
+            members[idx].isMale = row.querySelector('.edit-gender').value === "true";
+            members[idx].isDriver = row.querySelector('.edit-driver').checked;
+            members[idx].hasCar = row.querySelector('.edit-car').checked;
+            editingId = null;
+            renderMasterTable();
+            renderSelectionPanel();
+        }
+
+        function toggleActive(num) {
+            const idx = members.findIndex(m => m.num === num);
+            members[idx].active = !members[idx].active;
+            renderSelectionPanel();
+            if (!document.getElementById('settingsModal').classList.contains('hidden')) renderMasterTable();
+        }
+
+        function renderMasterTable() {
+            const body = document.getElementById('masterTableBody');
+            body.innerHTML = members.map(m => {
+                if (editingId === m.num) {
+                    return `
+                        <tr data-id="${m.num}" class="bg-indigo-50/50">
+                            <td class="px-4 py-3 font-black text-indigo-400 text-center text-[11px]">#${m.num}</td>
+                            <td class="px-4 py-3"><input type="text" class="edit-name w-full p-1 border rounded text-[11px] font-bold" value="${m.name}"></td>
+                            <td class="px-4 py-3 text-center">
+                                <select class="edit-gender text-[11px] font-bold p-1 border rounded">
+                                    <option value="true" ${m.isMale ? 'selected' : ''}>Male</option>
+                                    <option value="false" ${!m.isMale ? 'selected' : ''}>Female</option>
+                                </select>
+                            </td>
+                            <td class="px-4 py-3 text-center"><input type="checkbox" class="edit-driver" ${m.isDriver ? 'checked' : ''}></td>
+                            <td class="px-4 py-3 text-center"><input type="checkbox" class="edit-car" ${m.hasCar ? 'checked' : ''}></td>
+                            <td class="px-4 py-3 text-right">
+                                <button onclick="saveEdit('${m.num}')" class="text-indigo-600 font-black text-[9px] uppercase mr-3">Save</button>
+                                <button onclick="editingId = null; renderMasterTable()" class="text-slate-400 font-black text-[9px] uppercase">Cancel</button>
+                            </td>
+                        </tr>
+                    `;
+                }
+                return `
+                    <tr data-id="${m.num}" class="hover:bg-slate-50 text-[11px]">
+                        <td class="px-4 py-3 font-black text-slate-400 text-center">#${m.num}</td>
+                        <td class="px-4 py-3 font-bold">${m.name}</td>
+                        <td class="px-4 py-3 text-center"><span class="badge ${m.isMale ? 'badge-m' : 'badge-f'}">${m.isMale ? 'M' : 'F'}</span></td>
+                        <td class="px-4 py-3 text-center">${m.isDriver ? '✅' : '❌'}</td>
+                        <td class="px-4 py-3 text-center">${m.hasCar ? '✅' : '❌'}</td>
+                        <td class="px-4 py-3 text-right">
+                            <button onclick="startEdit('${m.num}')" class="text-indigo-600 hover:text-indigo-900 mx-2 font-bold uppercase text-[9px]">Edit</button>
+                            <button onclick="deleteMember('${m.num}')" class="text-rose-500 hover:text-rose-700 font-bold uppercase text-[9px]">Delete</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
         }
 
         function renderSelectionPanel() {
             const list = document.getElementById('selectionList');
-            const activePool = members.filter(m => m.active);
-            document.getElementById('memberCounter').textContent = activePool.length;
-            list.innerHTML = members.map((m, i) => `
-                <div class="member-item p-2.5 bg-white rounded-xl border border-slate-100 ${m.active ? 'active' : 'inactive'}" onclick="toggleActive(${i})">
+            document.getElementById('memberCounter').textContent = members.filter(m => m.active).length;
+            list.innerHTML = members.map(m => `
+                <div class="member-item p-2.5 bg-white rounded-xl border border-slate-100 ${m.active ? 'active' : 'inactive'}" onclick="toggleActive('${m.num}')">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2">
                             <span class="text-[9px] font-black text-slate-300">#${m.num}</span>
@@ -263,119 +336,90 @@
                         </div>
                         <div class="flex gap-1">
                             <span class="badge ${m.isMale ? 'badge-m' : 'badge-f'}">${m.isMale ? 'M' : 'F'}</span>
-                            ${m.isEnglish ? '<span class="badge badge-e">E</span>' : ''}
                             ${m.isDriver ? '<span class="badge badge-d">D</span>' : ''}
+                            ${m.hasCar ? '<span class="badge badge-c">C</span>' : ''}
                         </div>
                     </div>
                 </div>
             `).join('');
         }
 
-        function toggleActive(i) {
-            members[i].active = !members[i].active;
-            renderSelectionPanel();
+        function addPlannedShift() {
+            const date = document.getElementById('secDate').value;
+            const start = document.getElementById('secStart').value;
+            const end = document.getElementById('secEnd').value;
+            if (!date || !start || !end) return;
+            const timeRange = `${start}-${end}`;
+            if (plannedSecurity.some(s => s.date === date && s.timeRange === timeRange)) return;
+            plannedSecurity.push({ id: Date.now(), date, timeRange });
+            renderPlannedList();
+        }
+
+        function renderPlannedList() {
+            const container = document.getElementById('plannedSecList');
+            if (plannedSecurity.length === 0) {
+                container.innerHTML = '<p class="text-[9px] text-slate-400 italic text-center py-2">No planned shifts</p>';
+                return;
+            }
+            container.innerHTML = plannedSecurity.map(s => `
+                <div class="bg-white p-2 rounded-lg border border-slate-200 flex justify-between items-center shadow-sm">
+                    <div class="flex flex-col">
+                        <span class="text-[9px] font-black text-slate-400 uppercase tracking-tighter">${new Date(s.date).toDateString()}</span>
+                        <span class="text-[10px] font-bold text-indigo-600">${s.timeRange}</span>
+                    </div>
+                    <button onclick="plannedSecurity = plannedSecurity.filter(p => p.id !== ${s.id}); renderPlannedList();" class="text-slate-300 hover:text-rose-500">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+            `).join('');
         }
 
         function generateFullSchedule() {
             const startStr = document.getElementById('startDate').value;
             const endStr = document.getElementById('endDate').value;
             if (!startStr || !endStr) return;
-
             const start = new Date(startStr);
             const end = new Date(endStr);
             const activePool = members.filter(m => m.active);
-            if (activePool.length < 4) return;
-
-            const selectedArrival = Array.from(document.querySelectorAll('#busPeriods .time-pill.selected')).map(el => el.dataset.period);
-            const selectedSecurity = Array.from(document.querySelectorAll('#securityPeriods .time-pill.selected')).map(el => el.dataset.period);
-            
-            currentSchedule = [];
+            if (activePool.length < 2) return;
+            const arrivalKey = document.querySelector('#arrivalPeriod .time-pill.selected').dataset.period;
+            let currentSchedule = [];
             historyGlobal = {};
             activePool.forEach(p => historyGlobal[p.num] = 0);
-
             let current = new Date(start);
             let dayIdx = 0;
-
             while (current <= end) {
-                let dayData = { date: new Date(current), bus: [], sec: [], busy: { "0-3": [], "3-6": [], "6-12": [], "12-18": [], "18-24": [] } };
-                
-                const busPeriods = (dayIdx === 0) ? selectedArrival : Object.keys(SHIFT_DEFS);
-                busPeriods.forEach(key => {
-                    const players = pickPair(activePool, SHIFT_DEFS[key], dayData.busy[key]);
-                    dayData.bus.push({ key, time: SHIFT_DEFS[key], players, type: 'bus' });
-                    players.forEach(p => dayData.busy[key].push(p.num));
+                const dateISO = current.toISOString().split('T')[0];
+                let dayData = { date: new Date(current), bus: [], sec: [], busy: { "all": [] } };
+                plannedSecurity.filter(s => s.date === dateISO).forEach(ps => {
+                    const players = pickPair(activePool, ps.timeRange, dayData.busy["all"]);
+                    dayData.sec.push({ time: ps.timeRange, players });
+                    players.forEach(p => dayData.busy["all"].push(p.num));
                 });
-
-                selectedSecurity.forEach(key => {
-                    const players = pickPair(activePool, SHIFT_DEFS[key], dayData.busy[key], true);
-                    dayData.sec.push({ key, time: SHIFT_DEFS[key], players, type: 'sec' });
-                    players.forEach(p => dayData.busy[key].push(p.num));
+                const startIndex = dayIdx === 0 ? SHIFT_ORDER.indexOf(arrivalKey) : 0;
+                SHIFT_ORDER.slice(startIndex).forEach(key => {
+                    const players = pickPair(activePool, SHIFT_DEFS[key], dayData.busy["all"]);
+                    dayData.bus.push({ time: SHIFT_DEFS[key], players });
+                    players.forEach(p => dayData.busy["all"].push(p.num));
                 });
-
                 currentSchedule.push(dayData);
                 current.setDate(current.getDate() + 1);
                 dayIdx++;
             }
-            renderScheduleDisplay();
+            renderScheduleDisplay(currentSchedule);
         }
 
-        function rerollSlot(dayIdx, type, slotIdx) {
-            const dayData = currentSchedule[dayIdx];
-            const activePool = members.filter(m => m.active);
-            const slot = type === 'bus' ? dayData.bus[slotIdx] : dayData.sec[slotIdx];
-            
-            // Decrement old player history
-            slot.players.forEach(p => { if(p.num !== "?") historyGlobal[p.num] = Math.max(0, historyGlobal[p.num] - 1); });
-            
-            // Pick new ones
-            const otherType = type === 'bus' ? 'sec' : 'bus';
-            const concurrentOccupants = (dayData[otherType].find(s => s.key === slot.key)?.players || []).map(p => p.num);
-            slot.players = pickPair(activePool, slot.time, concurrentOccupants, type === 'sec');
-            renderScheduleDisplay();
-        }
-
-        function rerollDay(dayIdx) {
-            const dayData = currentSchedule[dayIdx];
-            const activePool = members.filter(m => m.active);
-            
-            [...dayData.bus, ...dayData.sec].forEach(s => {
-                s.players.forEach(p => { if(p.num !== "?") historyGlobal[p.num] = Math.max(0, historyGlobal[p.num] - 1); });
-            });
-
-            dayData.bus = []; dayData.sec = [];
-            dayData.busy = { "0-3": [], "3-6": [], "6-12": [], "12-18": [], "18-24": [] };
-
-            const isDay1 = dayIdx === 0;
-            const busPeriods = isDay1 ? Array.from(document.querySelectorAll('#busPeriods .time-pill.selected')).map(el => el.dataset.period) : Object.keys(SHIFT_DEFS);
-            const secPeriods = Array.from(document.querySelectorAll('#securityPeriods .time-pill.selected')).map(el => el.dataset.period);
-
-            busPeriods.forEach(key => {
-                const players = pickPair(activePool, SHIFT_DEFS[key], dayData.busy[key]);
-                dayData.bus.push({ key, time: SHIFT_DEFS[key], players, type: 'bus' });
-                players.forEach(p => dayData.busy[key].push(p.num));
-            });
-            secPeriods.forEach(key => {
-                const players = pickPair(activePool, SHIFT_DEFS[key], dayData.busy[key], true);
-                dayData.sec.push({ key, time: SHIFT_DEFS[key], players, type: 'sec' });
-                players.forEach(p => dayData.busy[key].push(p.num));
-            });
-
-            renderScheduleDisplay();
-        }
-
-        function pickPair(pool, time, exclusionList, isSecurity = false) {
-            let options = [];
+        function pickPair(pool, time, exclusionList) {
             const available = pool.filter(p => !exclusionList.includes(p.num));
             if (available.length < 2) return [{name: "Conflict", num: "?"}, {name: "Conflict", num: "?"}];
-
+            let options = [];
             for (let i = 0; i < available.length; i++) {
                 for (let j = i + 1; j < available.length; j++) {
                     const p1 = available[i]; const p2 = available[j];
-                    let score = (historyGlobal[p1.num] + historyGlobal[p2.num]) * 20;
-                    const isNight = time.startsWith("00:") || time.startsWith("03:") || time.startsWith("18:");
-                    if (isNight && p1.isMale === p2.isMale) score += 50;
-                    if (!p1.isDriver && !p2.isDriver) score += 70;
-                    if (!p1.isEnglish && !p2.isEnglish) score += 100;
+                    let score = (historyGlobal[p1.num] + historyGlobal[p2.num]) * 50;
+                    const isNight = time.startsWith("00:") || time.startsWith("03:") || time.startsWith("18:") || time.startsWith("2");
+                    if (isNight && !p1.isMale && !p2.isMale) score += 100;
+                    if (!p1.isDriver && !p2.isDriver) score += 200;
                     options.push({ pair: [p1, p2], score: score + Math.random() * 10 });
                 }
             }
@@ -385,114 +429,50 @@
             return winner;
         }
 
-        function renderScheduleDisplay() {
+        function renderScheduleDisplay(schedule) {
             const container = document.getElementById('scheduleContainer');
-            container.innerHTML = currentSchedule.map((day, dIdx) => `
-                <div class="card overflow-hidden">
+            container.innerHTML = schedule.map(day => `
+                <div class="card overflow-hidden border-indigo-50">
                     <div class="bg-slate-900 px-6 py-3 flex justify-between items-center text-white">
-                        <div class="flex items-center gap-4">
-                            <span class="text-xs font-black uppercase tracking-widest">${day.date.toDateString()}</span>
-                            <button onclick="rerollDay(${dIdx})" class="text-[9px] font-black text-indigo-400 border border-indigo-400/30 px-2 py-0.5 rounded hover:bg-indigo-400 hover:text-white transition-all uppercase">Reroll Day</button>
-                        </div>
-                        <span class="text-[9px] opacity-50 uppercase font-bold">Duty Roster</span>
+                        <span class="text-[10px] font-black uppercase tracking-widest">${day.date.toDateString()}</span>
                     </div>
-                    <div class="p-4 space-y-4">
-                        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                            ${day.bus.map((s, sIdx) => renderSlotUI(s, dIdx, 'bus', sIdx)).join('')}
+                    <div class="p-4 space-y-6">
+                        <div>
+                            <h4 class="text-[9px] font-black text-slate-400 uppercase mb-3 tracking-widest">Bus Rotation</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+                                ${day.bus.map(s => renderSlotUI(s)).join('')}
+                            </div>
                         </div>
                         ${day.sec.length > 0 ? `
-                            <div class="border-t pt-4">
-                                <h4 class="text-[9px] font-black text-indigo-400 uppercase mb-3 tracking-widest">Security Duties</h4>
-                                <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                                    ${day.sec.map((s, sIdx) => renderSlotUI(s, dIdx, 'sec', sIdx)).join('')}
-                                </div>
+                        <div class="border-t pt-4">
+                            <h4 class="text-[9px] font-black text-blue-500 uppercase mb-3 tracking-widest">Planned Shifts</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+                                ${day.sec.map(s => renderSlotUI(s, true)).join('')}
                             </div>
+                        </div>
                         ` : ''}
                     </div>
                 </div>
             `).join('');
         }
 
-        function renderSlotUI(s, dIdx, type, sIdx) {
+        function renderSlotUI(s, isCustom = false) {
+            const bgColor = isCustom ? 'bg-blue-50' : 'bg-slate-50';
             return `
-                <div class="${s.type === 'sec' ? 'bg-indigo-50 border-indigo-200' : 'bg-slate-50 border-slate-100'} border rounded-xl p-3 slot-card flex flex-col justify-between">
+                <div class="${bgColor} border border-black/5 rounded-xl p-3 h-full min-h-[100px]">
                     <div class="flex justify-between items-start mb-2">
-                        <p class="text-[10px] font-black ${s.type === 'sec' ? 'text-indigo-600' : 'text-slate-600'}">${s.time}</p>
-                        <button onclick="rerollSlot(${dIdx}, '${type}', ${sIdx})" class="reroll-btn p-1 bg-white border border-slate-200 rounded-md text-slate-400 hover:text-indigo-600 hover:border-indigo-600 shadow-sm transition-all" title="Reroll this slot">
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
-                        </button>
+                        <p class="text-[10px] font-black">${s.time}</p>
+                        ${isCustom ? `<span class="badge badge-sec text-[6px]">PLANNED</span>` : ''}
                     </div>
-                    <div class="space-y-1.5">
-                        ${s.players.map(p => `
-                            <div class="bg-white p-2 rounded-lg border border-slate-200 flex justify-between items-center shadow-sm">
-                                <span class="text-[10px] font-bold truncate">${p.name}</span>
-                                <div class="flex gap-0.5 shrink-0">
-                                    <span class="badge ${p.isMale ? 'badge-m' : 'badge-f'} scale-[0.7] -mx-0.5">${p.isMale ? 'M' : 'F'}</span>
-                                    ${p.isEnglish ? '<span class="badge badge-e scale-[0.7] -mx-0.5">E</span>' : ''}
-                                    ${p.isDriver ? '<span class="badge badge-d scale-[0.7] -mx-0.5" title="Driver">D</span>' : ''}
-                                    ${p.hasCar ? '<span class="badge badge-c scale-[0.7] -mx-0.5" title="Has Car">C</span>' : ''}
-                                </div>
-                            </div>
-                        `).join('')}
+                    <div class="space-y-1">
+                        ${s.players.map(p => `<div class="bg-white p-1.5 rounded-lg border border-slate-200 text-[10px] font-bold shadow-sm">${p.name}</div>`).join('')}
                     </div>
                 </div>
             `;
         }
 
         function openSettings() { document.getElementById('settingsModal').classList.remove('hidden'); renderMasterTable(); }
-        function closeSettings() { document.getElementById('settingsModal').classList.add('hidden'); renderSelectionPanel(); }
-        function showMemberEditor(index = -1) {
-            editingIndex = index;
-            const modal = document.getElementById('editorModal');
-            if (index === -1) {
-                document.getElementById('editName').value = "";
-                document.getElementById('editId').value = (members.length + 1).toString();
-                document.getElementById('editEnglish').checked = true;
-                document.getElementById('editDriver').checked = false;
-                document.getElementById('editCar').checked = false;
-            } else {
-                const m = members[index];
-                document.getElementById('editName').value = m.name;
-                document.getElementById('editId').value = m.num;
-                document.getElementById('editGender').value = m.isMale.toString();
-                document.getElementById('editEnglish').checked = m.isEnglish;
-                document.getElementById('editDriver').checked = m.isDriver;
-                document.getElementById('editCar').checked = m.hasCar;
-            }
-            modal.classList.remove('hidden');
-        }
-        function closeEditor() { document.getElementById('editorModal').classList.add('hidden'); }
-        function saveMember() {
-            const memberData = {
-                num: document.getElementById('editId').value,
-                name: document.getElementById('editName').value,
-                isMale: document.getElementById('editGender').value === 'true',
-                isEnglish: document.getElementById('editEnglish').checked,
-                isDriver: document.getElementById('editDriver').checked,
-                hasCar: document.getElementById('editCar').checked,
-                active: editingIndex === -1 ? true : members[editingIndex].active
-            };
-            if (editingIndex === -1) members.push(memberData);
-            else members[editingIndex] = memberData;
-            closeEditor(); renderMasterTable();
-        }
-        function renderMasterTable() {
-            const body = document.getElementById('masterTableBody');
-            body.innerHTML = members.map((m, i) => `
-                <tr class="hover:bg-indigo-50/30 text-[11px]">
-                    <td class="px-4 py-3 font-black text-slate-400">#${m.num}</td>
-                    <td class="px-4 py-3 font-bold">${m.name}</td>
-                    <td class="px-4 py-3 text-center"><span class="badge ${m.isMale ? 'badge-m' : 'badge-f'}">${m.isMale ? 'Male' : 'Female'}</span></td>
-                    <td class="px-4 py-3 text-center">${m.isEnglish ? '✅' : '❌'}</td>
-                    <td class="px-4 py-3 text-center">${m.isDriver ? '✅' : '❌'}</td>
-                    <td class="px-4 py-3 text-center">${m.hasCar ? '✅' : '❌'}</td>
-                    <td class="px-4 py-3 text-right">
-                        <button onclick="showMemberEditor(${i})" class="text-indigo-600 font-black uppercase text-[8px] mr-2">Edit</button>
-                        <button onclick="members.splice(${i}, 1); renderMasterTable()" class="text-rose-500 font-black uppercase text-[8px]">Delete</button>
-                    </td>
-                </tr>
-            `).join('');
-        }
+        function closeSettings() { document.getElementById('settingsModal').classList.add('hidden'); editingId = null; }
 
         init();
     </script>
