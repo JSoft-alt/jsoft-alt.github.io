@@ -136,7 +136,6 @@
                 </button>
             </div>
             
-            <!-- Quick Add Row -->
             <div class="bg-indigo-50 p-4 border-b border-indigo-100">
                 <div class="max-w-4xl mx-auto flex flex-wrap items-center gap-3">
                     <input type="text" id="newMemberName" placeholder="Staff Name" class="flex-1 min-w-[150px] p-2 rounded-lg border border-indigo-200 text-sm font-bold">
@@ -205,6 +204,7 @@
         let plannedSecurity = [];
         let historyGlobal = {};
         let editingId = null;
+        let lastScheduleData = [];
 
         function init() {
             const today = new Date();
@@ -241,139 +241,6 @@
             });
         }
 
-        function addNewMember() {
-            const name = document.getElementById('newMemberName').value.trim();
-            if (!name) return;
-            const newId = members.length > 0 ? (Math.max(...members.map(m => parseInt(m.num))) + 1).toString() : "1";
-            members.push({
-                num: newId,
-                name: name,
-                isMale: document.getElementById('newMemberGender').value === "true",
-                isDriver: document.getElementById('newMemberDriver').checked,
-                hasCar: document.getElementById('newMemberCar').checked,
-                active: true
-            });
-            document.getElementById('newMemberName').value = "";
-            renderMasterTable();
-            renderSelectionPanel();
-        }
-
-        function deleteMember(num) {
-            members = members.filter(m => m.num !== num);
-            renderMasterTable();
-            renderSelectionPanel();
-        }
-
-        function startEdit(num) { editingId = num; renderMasterTable(); }
-
-        function saveEdit(num) {
-            const row = document.querySelector(`tr[data-id="${num}"]`);
-            const idx = members.findIndex(m => m.num === num);
-            members[idx].name = row.querySelector('.edit-name').value;
-            members[idx].isMale = row.querySelector('.edit-gender').value === "true";
-            members[idx].isDriver = row.querySelector('.edit-driver').checked;
-            members[idx].hasCar = row.querySelector('.edit-car').checked;
-            editingId = null;
-            renderMasterTable();
-            renderSelectionPanel();
-        }
-
-        function toggleActive(num) {
-            const idx = members.findIndex(m => m.num === num);
-            members[idx].active = !members[idx].active;
-            renderSelectionPanel();
-            if (!document.getElementById('settingsModal').classList.contains('hidden')) renderMasterTable();
-        }
-
-        function renderMasterTable() {
-            const body = document.getElementById('masterTableBody');
-            body.innerHTML = members.map(m => {
-                if (editingId === m.num) {
-                    return `
-                        <tr data-id="${m.num}" class="bg-indigo-50/50">
-                            <td class="px-4 py-3 font-black text-indigo-400 text-center text-[11px]">#${m.num}</td>
-                            <td class="px-4 py-3"><input type="text" class="edit-name w-full p-1 border rounded text-[11px] font-bold" value="${m.name}"></td>
-                            <td class="px-4 py-3 text-center">
-                                <select class="edit-gender text-[11px] font-bold p-1 border rounded">
-                                    <option value="true" ${m.isMale ? 'selected' : ''}>Male</option>
-                                    <option value="false" ${!m.isMale ? 'selected' : ''}>Female</option>
-                                </select>
-                            </td>
-                            <td class="px-4 py-3 text-center"><input type="checkbox" class="edit-driver" ${m.isDriver ? 'checked' : ''}></td>
-                            <td class="px-4 py-3 text-center"><input type="checkbox" class="edit-car" ${m.hasCar ? 'checked' : ''}></td>
-                            <td class="px-4 py-3 text-right">
-                                <button onclick="saveEdit('${m.num}')" class="text-indigo-600 font-black text-[9px] uppercase mr-3">Save</button>
-                                <button onclick="editingId = null; renderMasterTable()" class="text-slate-400 font-black text-[9px] uppercase">Cancel</button>
-                            </td>
-                        </tr>
-                    `;
-                }
-                return `
-                    <tr data-id="${m.num}" class="hover:bg-slate-50 text-[11px]">
-                        <td class="px-4 py-3 font-black text-slate-400 text-center">#${m.num}</td>
-                        <td class="px-4 py-3 font-bold">${m.name}</td>
-                        <td class="px-4 py-3 text-center"><span class="badge ${m.isMale ? 'badge-m' : 'badge-f'}">${m.isMale ? 'M' : 'F'}</span></td>
-                        <td class="px-4 py-3 text-center">${m.isDriver ? '✅' : '❌'}</td>
-                        <td class="px-4 py-3 text-center">${m.hasCar ? '✅' : '❌'}</td>
-                        <td class="px-4 py-3 text-right">
-                            <button onclick="startEdit('${m.num}')" class="text-indigo-600 hover:text-indigo-900 mx-2 font-bold uppercase text-[9px]">Edit</button>
-                            <button onclick="deleteMember('${m.num}')" class="text-rose-500 hover:text-rose-700 font-bold uppercase text-[9px]">Delete</button>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-        }
-
-        function renderSelectionPanel() {
-            const list = document.getElementById('selectionList');
-            document.getElementById('memberCounter').textContent = members.filter(m => m.active).length;
-            list.innerHTML = members.map(m => `
-                <div class="member-item p-2.5 bg-white rounded-xl border border-slate-100 ${m.active ? 'active' : 'inactive'}" onclick="toggleActive('${m.num}')">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-2">
-                            <span class="text-[9px] font-black text-slate-300">#${m.num}</span>
-                            <p class="text-[10px] font-bold text-slate-700 truncate w-32">${m.name}</p>
-                        </div>
-                        <div class="flex gap-1">
-                            <span class="badge ${m.isMale ? 'badge-m' : 'badge-f'}">${m.isMale ? 'M' : 'F'}</span>
-                            ${m.isDriver ? '<span class="badge badge-d">D</span>' : ''}
-                            ${m.hasCar ? '<span class="badge badge-c">C</span>' : ''}
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function addPlannedShift() {
-            const date = document.getElementById('secDate').value;
-            const start = document.getElementById('secStart').value;
-            const end = document.getElementById('secEnd').value;
-            if (!date || !start || !end) return;
-            const timeRange = `${start}-${end}`;
-            if (plannedSecurity.some(s => s.date === date && s.timeRange === timeRange)) return;
-            plannedSecurity.push({ id: Date.now(), date, timeRange });
-            renderPlannedList();
-        }
-
-        function renderPlannedList() {
-            const container = document.getElementById('plannedSecList');
-            if (plannedSecurity.length === 0) {
-                container.innerHTML = '<p class="text-[9px] text-slate-400 italic text-center py-2">No planned shifts</p>';
-                return;
-            }
-            container.innerHTML = plannedSecurity.map(s => `
-                <div class="bg-white p-2 rounded-lg border border-slate-200 flex justify-between items-center shadow-sm">
-                    <div class="flex flex-col">
-                        <span class="text-[9px] font-black text-slate-400 uppercase tracking-tighter">${new Date(s.date).toDateString()}</span>
-                        <span class="text-[10px] font-bold text-indigo-600">${s.timeRange}</span>
-                    </div>
-                    <button onclick="plannedSecurity = plannedSecurity.filter(p => p.id !== ${s.id}); renderPlannedList();" class="text-slate-300 hover:text-rose-500">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                    </button>
-                </div>
-            `).join('');
-        }
-
         function generateFullSchedule() {
             const startStr = document.getElementById('startDate').value;
             const endStr = document.getElementById('endDate').value;
@@ -382,31 +249,64 @@
             const end = new Date(endStr);
             const activePool = members.filter(m => m.active);
             if (activePool.length < 2) return;
+            
             const arrivalKey = document.querySelector('#arrivalPeriod .time-pill.selected').dataset.period;
             let currentSchedule = [];
             historyGlobal = {};
             activePool.forEach(p => historyGlobal[p.num] = 0);
+
             let current = new Date(start);
             let dayIdx = 0;
             while (current <= end) {
                 const dateISO = current.toISOString().split('T')[0];
-                let dayData = { date: new Date(current), bus: [], sec: [], busy: { "all": [] } };
-                plannedSecurity.filter(s => s.date === dateISO).forEach(ps => {
-                    const players = pickPair(activePool, ps.timeRange, dayData.busy["all"]);
-                    dayData.sec.push({ time: ps.timeRange, players });
-                    players.forEach(p => dayData.busy["all"].push(p.num));
-                });
-                const startIndex = dayIdx === 0 ? SHIFT_ORDER.indexOf(arrivalKey) : 0;
-                SHIFT_ORDER.slice(startIndex).forEach(key => {
-                    const players = pickPair(activePool, SHIFT_DEFS[key], dayData.busy["all"]);
-                    dayData.bus.push({ time: SHIFT_DEFS[key], players });
-                    players.forEach(p => dayData.busy["all"].push(p.num));
-                });
-                currentSchedule.push(dayData);
+                currentSchedule.push(generateDayData(new Date(current), activePool, dateISO, dayIdx === 0 ? arrivalKey : "0-3"));
                 current.setDate(current.getDate() + 1);
                 dayIdx++;
             }
+            lastScheduleData = currentSchedule;
             renderScheduleDisplay(currentSchedule);
+        }
+
+        function generateDayData(dateObj, pool, dateISO, startKey) {
+            let dayData = { date: dateObj, dateISO: dateISO, bus: [], sec: [], busy: { "all": [] }, startKey: startKey };
+            
+            // Map planned security
+            plannedSecurity.filter(s => s.date === dateISO).forEach(ps => {
+                const players = pickPair(pool, ps.timeRange, dayData.busy["all"]);
+                dayData.sec.push({ time: ps.timeRange, players });
+                players.forEach(p => dayData.busy["all"].push(p.num));
+            });
+
+            // Map bus rotation
+            const startIndex = SHIFT_ORDER.indexOf(startKey);
+            SHIFT_ORDER.slice(startIndex).forEach(key => {
+                const players = pickPair(pool, SHIFT_DEFS[key], dayData.busy["all"]);
+                dayData.bus.push({ time: SHIFT_DEFS[key], players });
+                players.forEach(p => dayData.busy["all"].push(p.num));
+            });
+            return dayData;
+        }
+
+        function rerollDay(dateISO) {
+            const idx = lastScheduleData.findIndex(d => d.dateISO === dateISO);
+            if (idx === -1) return;
+
+            // Recalculate history based on all OTHER days to keep fairness
+            const activePool = members.filter(m => m.active);
+            historyGlobal = {};
+            activePool.forEach(p => historyGlobal[p.num] = 0);
+            
+            lastScheduleData.forEach((day, dIdx) => {
+                if (dIdx !== idx) {
+                    [...day.bus, ...day.sec].forEach(s => {
+                        s.players.forEach(p => { if(historyGlobal[p.num] !== undefined) historyGlobal[p.num]++; });
+                    });
+                }
+            });
+
+            // Re-generate this specific day
+            lastScheduleData[idx] = generateDayData(lastScheduleData[idx].date, activePool, dateISO, lastScheduleData[idx].startKey);
+            renderScheduleDisplay(lastScheduleData);
         }
 
         function pickPair(pool, time, exclusionList) {
@@ -435,6 +335,10 @@
                 <div class="card overflow-hidden border-indigo-50">
                     <div class="bg-slate-900 px-6 py-3 flex justify-between items-center text-white">
                         <span class="text-[10px] font-black uppercase tracking-widest">${day.date.toDateString()}</span>
+                        <button onclick="rerollDay('${day.dateISO}')" class="flex items-center gap-2 hover:text-indigo-300 transition-colors text-[9px] font-black uppercase tracking-tighter">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+                            Reroll Day
+                        </button>
                     </div>
                     <div class="p-4 space-y-6">
                         <div>
@@ -471,8 +375,122 @@
             `;
         }
 
+        // --- Database & Utility UI Functions ---
         function openSettings() { document.getElementById('settingsModal').classList.remove('hidden'); renderMasterTable(); }
         function closeSettings() { document.getElementById('settingsModal').classList.add('hidden'); editingId = null; }
+
+        function renderSelectionPanel() {
+            const list = document.getElementById('selectionList');
+            document.getElementById('memberCounter').textContent = members.filter(m => m.active).length;
+            list.innerHTML = members.map(m => `
+                <div class="member-item p-2.5 bg-white rounded-xl border border-slate-100 ${m.active ? 'active' : 'inactive'}" onclick="toggleActive('${m.num}')">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="text-[9px] font-black text-slate-300">#${m.num}</span>
+                            <p class="text-[10px] font-bold text-slate-700 truncate w-32">${m.name}</p>
+                        </div>
+                        <div class="flex gap-1">
+                            <span class="badge ${m.isMale ? 'badge-m' : 'badge-f'}">${m.isMale ? 'M' : 'F'}</span>
+                            ${m.isDriver ? '<span class="badge badge-d">D</span>' : ''}
+                            ${m.hasCar ? '<span class="badge badge-c">C</span>' : ''}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function toggleActive(num) {
+            const idx = members.findIndex(m => m.num === num);
+            members[idx].active = !members[idx].active;
+            renderSelectionPanel();
+        }
+
+        function renderMasterTable() {
+            const body = document.getElementById('masterTableBody');
+            body.innerHTML = members.map(m => {
+                if (editingId === m.num) {
+                    return `
+                        <tr data-id="${m.num}" class="bg-indigo-50/50">
+                            <td class="px-4 py-3 font-black text-indigo-400 text-center text-[11px]">#${m.num}</td>
+                            <td class="px-4 py-3"><input type="text" class="edit-name w-full p-1 border rounded text-[11px] font-bold" value="${m.name}"></td>
+                            <td class="px-4 py-3 text-center">
+                                <select class="edit-gender text-[11px] font-bold p-1 border rounded">
+                                    <option value="true" ${m.isMale ? 'selected' : ''}>Male</option>
+                                    <option value="false" ${!m.isMale ? 'selected' : ''}>Female</option>
+                                </select>
+                            </td>
+                            <td class="px-4 py-3 text-center"><input type="checkbox" class="edit-driver" ${m.isDriver ? 'checked' : ''}></td>
+                            <td class="px-4 py-3 text-center"><input type="checkbox" class="edit-car" ${m.hasCar ? 'checked' : ''}></td>
+                            <td class="px-4 py-3 text-right">
+                                <button onclick="saveEdit('${m.num}')" class="text-indigo-600 font-black text-[9px] uppercase mr-3">Save</button>
+                                <button onclick="editingId = null; renderMasterTable()" class="text-slate-400 font-black text-[9px] uppercase">Cancel</button>
+                            </td>
+                        </tr>
+                    `;
+                }
+                return `<tr data-id="${m.num}" class="hover:bg-slate-50 text-[11px]">
+                    <td class="px-4 py-3 font-black text-slate-400 text-center">#${m.num}</td>
+                    <td class="px-4 py-3 font-bold">${m.name}</td>
+                    <td class="px-4 py-3 text-center"><span class="badge ${m.isMale ? 'badge-m' : 'badge-f'}">${m.isMale ? 'M' : 'F'}</span></td>
+                    <td class="px-4 py-3 text-center">${m.isDriver ? '✅' : '❌'}</td>
+                    <td class="px-4 py-3 text-center">${m.hasCar ? '✅' : '❌'}</td>
+                    <td class="px-4 py-3 text-right">
+                        <button onclick="startEdit('${m.num}')" class="text-indigo-600 font-bold uppercase text-[9px] mx-2">Edit</button>
+                        <button onclick="deleteMember('${m.num}')" class="text-rose-500 font-bold uppercase text-[9px]">Delete</button>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        function startEdit(num) { editingId = num; renderMasterTable(); }
+        function saveEdit(num) {
+            const row = document.querySelector(`tr[data-id="${num}"]`);
+            const idx = members.findIndex(m => m.num === num);
+            members[idx].name = row.querySelector('.edit-name').value;
+            members[idx].isMale = row.querySelector('.edit-gender').value === "true";
+            members[idx].isDriver = row.querySelector('.edit-driver').checked;
+            members[idx].hasCar = row.querySelector('.edit-car').checked;
+            editingId = null;
+            renderMasterTable(); renderSelectionPanel();
+        }
+
+        function deleteMember(num) { members = members.filter(m => m.num !== num); renderMasterTable(); renderSelectionPanel(); }
+
+        function addNewMember() {
+            const name = document.getElementById('newMemberName').value.trim();
+            if (!name) return;
+            const newId = members.length > 0 ? (Math.max(...members.map(m => parseInt(m.num))) + 1).toString() : "1";
+            members.push({
+                num: newId, name, isMale: document.getElementById('newMemberGender').value === "true",
+                isDriver: document.getElementById('newMemberDriver').checked, hasCar: document.getElementById('newMemberCar').checked, active: true
+            });
+            document.getElementById('newMemberName').value = ""; renderMasterTable(); renderSelectionPanel();
+        }
+
+        function addPlannedShift() {
+            const date = document.getElementById('secDate').value;
+            const start = document.getElementById('secStart').value;
+            const end = document.getElementById('secEnd').value;
+            if (!date || !start || !end) return;
+            plannedSecurity.push({ id: Date.now(), date, timeRange: `${start}-${end}` });
+            renderPlannedList();
+        }
+
+        function renderPlannedList() {
+            const container = document.getElementById('plannedSecList');
+            if (plannedSecurity.length === 0) { container.innerHTML = '<p class="text-[9px] text-slate-400 italic text-center py-2">No planned shifts</p>'; return; }
+            container.innerHTML = plannedSecurity.map(s => `
+                <div class="bg-white p-2 rounded-lg border border-slate-200 flex justify-between items-center shadow-sm">
+                    <div class="flex flex-col">
+                        <span class="text-[9px] font-black text-slate-400 uppercase tracking-tighter">${new Date(s.date).toDateString()}</span>
+                        <span class="text-[10px] font-bold text-indigo-600">${s.timeRange}</span>
+                    </div>
+                    <button onclick="plannedSecurity = plannedSecurity.filter(p => p.id !== ${s.id}); renderPlannedList();" class="text-slate-300 hover:text-rose-500">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+            `).join('');
+        }
 
         init();
     </script>
