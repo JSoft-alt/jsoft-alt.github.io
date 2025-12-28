@@ -3,341 +3,498 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bus Scheduler</title>
+    <title>Shift Master Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background-color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
-        .card { background: white; border-radius: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; }
-        .slot-card { min-height: 110px; transition: background 0.2s; }
-        .slot-card:hover { background-color: #f1f5f9; }
-        .skipped { opacity: 0.5; background-color: #f8fafc !important; }
-        .gender-m { color: #3b82f6; }
-        .gender-f { color: #f472b6; }
-        .is-driver { color: #10b981; }
-        .is-english { color: #8b5cf6; }
+        body { background-color: #f8fafc; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+        .card { background: white; border-radius: 1rem; box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1); border: 1px solid #e2e8f0; }
+        .slot-card { min-height: 120px; transition: all 0.2s; border: 1px solid transparent; position: relative; }
+        .slot-card:hover { border-color: #6366f1; background-color: #f8fafc; }
+        
+        .member-item { cursor: pointer; transition: all 0.2s; border: 2px solid transparent; }
+        .member-item.inactive { opacity: 0.4; filter: grayscale(1); }
+        .member-item.active { border-color: #6366f1; background-color: #eef2ff; }
+        
+        .badge { font-size: 8px; font-weight: 800; padding: 2px 4px; border-radius: 4px; text-transform: uppercase; }
+        .badge-m { background-color: #dbeafe; color: #1e40af; }
+        .badge-f { background-color: #fce7f3; color: #9d174d; }
+        .badge-e { background-color: #f3e8ff; color: #6b21a8; }
+        .badge-d { background-color: #dcfce7; color: #166534; }
+        .badge-c { background-color: #fef9c3; color: #854d0e; }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+
+        .time-pill { cursor: pointer; user-select: none; transition: all 0.2s; border: 1px solid #e2e8f0; }
+        .time-pill.selected { background-color: #6366f1; color: white; border-color: #6366f1; }
+        
+        .reroll-btn { opacity: 0; transition: opacity 0.2s; }
+        .slot-card:hover .reroll-btn { opacity: 1; }
+        
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .animate-spin-once { animation: spin 0.5s ease-in-out; }
     </style>
 </head>
-<body class="p-4 md:p-8">
-    <div class="max-w-6xl mx-auto">
+<body class="p-4 md:p-8 text-slate-900">
+    <div class="max-w-7xl mx-auto">
         <!-- Header -->
-        <header class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div class="flex items-center gap-3">
-                <div class="bg-indigo-600 text-white p-2 rounded-lg shadow-md">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+        <header class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div class="flex items-center gap-4">
+                <div class="bg-indigo-600 text-white p-3 rounded-2xl shadow-lg">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
                 </div>
                 <div>
-                    <h1 class="text-2xl font-bold tracking-tight text-slate-800">Bus Scheduler</h1>
+                    <h1 class="text-3xl font-black text-slate-900 tracking-tight uppercase">Shift Master</h1>
+                    <p class="text-slate-500 text-sm font-medium italic">Team Rotation & Arrival Management</p>
                 </div>
             </div>
             <div class="flex gap-2">
-                <button id="exportBtn" class="hidden bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-6 py-3 rounded-xl font-bold shadow-sm transition-transform active:scale-95 flex items-center gap-2">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 10 0 1-2 2H5a2 2 10 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-                    Export Text
-                </button>
-                <button id="generateBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg transition-transform active:scale-95 flex items-center gap-2">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                    Generate Schedule
-                </button>
+                <button id="openSettingsBtn" class="bg-white border border-slate-200 text-slate-700 px-5 py-3 rounded-xl font-bold text-sm hover:bg-slate-50 shadow-sm transition-all">Team Database</button>
+                <button id="generateBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg transition-all active:scale-95 text-sm uppercase tracking-widest">Generate Schedule</button>
             </div>
         </header>
 
-        <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
-            <aside class="space-y-6">
-                <div class="card p-6">
-                    <h2 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 border-b pb-2">Settings</h2>
-                    <div class="space-y-4">
+        <div class="grid grid-cols-1 xl:grid-cols-12 gap-8">
+            <!-- Sidebar -->
+            <aside class="xl:col-span-4 space-y-6">
+                <div class="card p-6 border-indigo-100">
+                    <div class="flex justify-between items-center mb-6 border-b pb-4">
+                        <h2 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Config</h2>
+                        <button onclick="generateFullSchedule()" class="text-[9px] font-bold text-indigo-600 uppercase hover:underline">Reroll All</button>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-6">
                         <div>
-                            <label class="block text-sm font-semibold mb-1 text-slate-700">Total Duration (Days)</label>
-                            <input type="number" id="daysInput" value="4" min="1" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
+                            <label class="block text-[10px] font-bold text-slate-500 mb-1 uppercase">Start Date</label>
+                            <input type="date" id="startDate" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-[11px] outline-none">
                         </div>
                         <div>
-                            <label class="block text-sm font-semibold mb-1 text-slate-700">Start on Day</label>
-                            <select id="startDayInput" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg outline-none cursor-pointer"></select>
+                            <label class="block text-[10px] font-bold text-slate-500 mb-1 uppercase">End Date</label>
+                            <input type="date" id="endDate" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-[11px] outline-none">
                         </div>
-                        <div>
-                            <label class="block text-sm font-semibold mb-1 text-slate-700">Start Time Slot</label>
-                            <select id="startTimeInput" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg outline-none cursor-pointer"></select>
+                    </div>
+
+                    <!-- Arrival Section -->
+                    <div class="mb-6 p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100">
+                        <h3 class="text-xs font-black text-indigo-900 uppercase mb-3">Day 1 Arrival Period</h3>
+                        <div id="busPeriods" class="grid grid-cols-3 gap-1.5">
+                            <div data-period="0-3" class="time-pill px-2 py-1.5 rounded-lg text-center text-[10px] font-bold bg-white">0-3</div>
+                            <div data-period="3-6" class="time-pill px-2 py-1.5 rounded-lg text-center text-[10px] font-bold bg-white">3-6</div>
+                            <div data-period="6-12" class="time-pill px-2 py-1.5 rounded-lg text-center text-[10px] font-bold bg-white">6-12</div>
+                            <div data-period="12-18" class="time-pill selected px-2 py-1.5 rounded-lg text-center text-[10px] font-bold bg-white">12-18</div>
+                            <div data-period="18-24" class="time-pill px-2 py-1.5 rounded-lg text-center text-[10px] font-bold bg-white">18-24</div>
+                        </div>
+                    </div>
+
+                    <!-- Security Performance Section -->
+                    <div class="mb-6 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                        <h3 class="text-xs font-black text-slate-900 uppercase mb-3">Security Shifts</h3>
+                        <div id="securityPeriods" class="grid grid-cols-3 gap-1.5">
+                            <div data-period="0-3" class="time-pill px-2 py-1.5 rounded-lg text-center text-[10px] font-bold bg-white">0-3</div>
+                            <div data-period="3-6" class="time-pill px-2 py-1.5 rounded-lg text-center text-[10px] font-bold bg-white">3-6</div>
+                            <div data-period="6-12" class="time-pill px-2 py-1.5 rounded-lg text-center text-[10px] font-bold bg-white">6-12</div>
+                            <div data-period="12-18" class="time-pill selected px-2 py-1.5 rounded-lg text-center text-[10px] font-bold bg-white">12-18</div>
+                            <div data-period="18-24" class="time-pill selected px-2 py-1.5 rounded-lg text-center text-[10px] font-bold bg-white">18-24</div>
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="card p-6">
-                    <h2 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 border-b pb-2">Personnel</h2>
-                    <textarea id="peopleInput" rows="8" class="w-full p-3 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none resize-none focus:ring-2 focus:ring-indigo-500" placeholder="Enter numbers (1-25) separated by commas...">1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 21, 22, 23, 24, 25</textarea>
-                    <div class="mt-3 space-y-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                        <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-blue-500"></span> Males</div>
-                        <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-pink-400"></span> Females</div>
-                        <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-emerald-500"></span> Driver (D)</div>
-                        <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-violet-500"></span> English (E)</div>
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-xs font-black text-slate-400 uppercase tracking-widest">Active Staff</h2>
+                        <span id="memberCounter" class="bg-indigo-100 text-indigo-700 text-[10px] px-2 py-0.5 rounded-full font-black">0</span>
                     </div>
+                    <div id="selectionList" class="space-y-2 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar"></div>
                 </div>
             </aside>
 
-            <main id="scheduleContainer" class="lg:col-span-3 space-y-6 text-slate-400 text-center py-24 border-2 border-dashed border-slate-200 rounded-3xl bg-white shadow-inner">
-                <div class="flex flex-col items-center gap-2">
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="opacity-20"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
-                    <p class="font-medium">Configure settings and click "Generate Schedule"</p>
+            <!-- Main Display -->
+            <main class="xl:col-span-8">
+                <div id="scheduleContainer" class="space-y-8 pb-24">
+                    <div class="card p-24 text-center border-dashed border-2 flex flex-col items-center justify-center text-slate-300">
+                        <p class="font-bold uppercase tracking-[0.2em] text-xs">Set range and click generate</p>
+                    </div>
                 </div>
             </main>
         </div>
     </div>
 
+    <!-- MODAL: Team Database -->
+    <div id="settingsModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl w-full max-w-6xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            <div class="bg-slate-900 p-6 text-white flex justify-between items-center shrink-0">
+                <div class="flex items-center gap-4">
+                    <h3 class="text-xl font-bold uppercase tracking-tight">Team Database</h3>
+                    <button onclick="showMemberEditor()" class="bg-indigo-500 hover:bg-indigo-400 text-white px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-colors">+ Add New Member</button>
+                </div>
+                <button onclick="closeSettings()" class="hover:bg-slate-700 p-2 rounded-lg">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto custom-scrollbar flex-1 bg-slate-50">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-white border-b text-slate-400 uppercase font-black text-[9px] sticky top-0 z-10">
+                        <tr>
+                            <th class="px-4 py-3">ID</th>
+                            <th class="px-4 py-3">Full Name</th>
+                            <th class="px-4 py-3 text-center">Gender</th>
+                            <th class="px-4 py-3 text-center">English</th>
+                            <th class="px-4 py-3 text-center">Driver</th>
+                            <th class="px-4 py-3 text-center">Car</th>
+                            <th class="px-4 py-3 text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="masterTableBody" class="divide-y divide-slate-100 bg-white"></tbody>
+                </table>
+            </div>
+            <div class="p-4 bg-white border-t flex justify-end">
+                <button onclick="closeSettings()" class="px-10 py-2.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-all">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Member Editor -->
+    <div id="editorModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm hidden z-[60] flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl">
+            <h3 id="editorTitle" class="text-xl font-black uppercase mb-6 text-slate-900">Add Team Member</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Full Name</label>
+                    <input type="text" id="editName" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Gender</label>
+                        <select id="editGender" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold">
+                            <option value="false">Female</option>
+                            <option value="true">Male</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">ID Number</label>
+                        <input type="text" id="editId" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold">
+                    </div>
+                </div>
+                <div class="space-y-2 pt-2">
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" id="editEnglish" class="w-5 h-5 accent-indigo-600">
+                        <span class="text-xs font-bold text-slate-700">English Speaker</span>
+                    </label>
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" id="editDriver" class="w-5 h-5 accent-indigo-600">
+                        <span class="text-xs font-bold text-slate-700">Driver License</span>
+                    </label>
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" id="editCar" class="w-5 h-5 accent-indigo-600">
+                        <span class="text-xs font-bold text-slate-700">Has Own Car</span>
+                    </label>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-8">
+                <button onclick="closeEditor()" class="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-all uppercase text-xs">Cancel</button>
+                <button onclick="saveMember()" class="flex-2 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all uppercase text-xs px-8">Save Member</button>
+            </div>
+        </div>
+    </div>
+
     <script>
-        const NAME_MAP = {
-            "1": "Qing Wang", "2": "Hao Wang (Diana)", "3": "Ling Young", "4": "Ma Lan (Lotus Li)",
-            "5": "Tham Nguyen (Mina)", "6": "Qing Han", "7": "Le Thi Oanh (Aria)", "8": "Li Han",
-            "9": "Ping Jiang", "10": "Hongjun Zheng (Lucinda)", "11": "Dongxia Sun", 
-            "12": "Xuemei Song (Sophie)", "13": "Deyun Xia", "14": "Lily Jia", 
-            "15": "Tuyet Nhung (Adela)", "16": "Thi Lien Huong (Lotus)", "17": "Ling Wu (Cassie)",
-            "18": "Yongxian Li (Lynna)", "19": "Xiaodong Xu (William)", "20": "Larrison Manygoats",
-            "21": "Zhiyuan Xie (Harry)", "22": "xiaoxiao", "23": "Cong Nguyen (Charles)",
-            "24": "Jincheng Guo (Eric)", "25": "Shunxiang Wu"
-        };
-
-        const MALES = ["19", "21", "22", "23", "24", "25"];
-        const ENGLISH_SPEAKERS = ["1", "2", "3", "4", "5", "6", "7", "14", "15", "16", "17", "18", "19", "21", "22", "23", "24"];
-        const NON_ENGLISH = ["8", "9", "10", "11", "12", "13", "25"];
-        const NON_DRIVERS = ["2", "7", "8", "12", "13", "23", "24", "25"];
-        // Explicitly including 20 in AVOID to ensure removal
-        const AVOID = ["18", "19", "20"]; 
-        const NEEDS_ENG = ["5", "23"];
-
-        const TIME_SLOTS = [
-            { label: "00:00-03:00", value: "0-3", isNight: true },
-            { label: "03:00-06:00", value: "3-6", isNight: true },
-            { label: "06:00-12:00", value: "6-12", isNight: false },
-            { label: "12:00-18:00", value: "12-18", isNight: false },
-            { label: "18:00-24:00", value: "18-24", isNight: true },
+        let members = [
+            { num: "1", name: "Qing Wang", isMale: false, isEnglish: true, isDriver: true, hasCar: true, active: true },
+            { num: "2", name: "Hao Wang (Diana)", isMale: false, isEnglish: true, isDriver: false, hasCar: false, active: true },
+            { num: "3", name: "Ling Young", isMale: false, isEnglish: true, isDriver: true, hasCar: false, active: true },
+            { num: "4", name: "Ma Lan (Sophia Li)", isMale: false, isEnglish: true, isDriver: true, hasCar: true, active: true },
+            { num: "5", name: "Tham Nguyen (Mina)", isMale: false, isEnglish: true, isDriver: true, hasCar: false, active: true },
+            { num: "6", name: "Qing Han", isMale: false, isEnglish: true, isDriver: true, hasCar: false, active: true },
+            { num: "7", name: "Le Thi Oanh (Aria)", isMale: false, isEnglish: true, isDriver: false, hasCar: false, active: true },
+            { num: "8", name: "Li Han", isMale: false, isEnglish: false, isDriver: false, hasCar: false, active: true },
+            { num: "9", name: "Ping Jiang", isMale: false, isEnglish: false, isDriver: true, hasCar: false, active: true },
+            { num: "10", name: "Hongjun Zheng (Lucinda)", isMale: false, isEnglish: false, isDriver: false, hasCar: false, active: true },
+            { num: "11", name: "Dongxia Sun", isMale: false, isEnglish: false, isDriver: true, hasCar: false, active: true },
+            { num: "12", name: "Xuemei Song (Sophie)", isMale: false, isEnglish: false, isDriver: false, hasCar: false, active: true },
+            { num: "13", name: "Deyun Xia", isMale: false, isEnglish: false, isDriver: false, hasCar: false, active: true },
+            { num: "14", name: "Lily Jia", isMale: false, isEnglish: true, isDriver: true, hasCar: true, active: true },
+            { num: "15", name: "Tuyet Nhung (Adela)", isMale: false, isEnglish: true, isDriver: true, hasCar: false, active: true },
+            { num: "16", name: "Thi Lien Huong (Lotus)", isMale: false, isEnglish: true, isDriver: true, hasCar: false, active: true },
+            { num: "17", name: "Ling Wu (Cassie)", isMale: false, isEnglish: true, isDriver: true, hasCar: false, active: true },
+            { num: "18", name: "Yongxian Li (Lynna)", isMale: false, isEnglish: true, isDriver: true, hasCar: true, active: true },
+            { num: "19", name: "Xiaodong Xu (William)", isMale: true, isEnglish: true, isDriver: true, hasCar: true, active: true },
+            { num: "20", name: "Larrison Manygoats", isMale: true, isEnglish: true, isDriver: true, hasCar: true, active: true },
+            { num: "21", name: "Zhiyuan Xie (Harry)", isMale: true, isEnglish: true, isDriver: true, hasCar: true, active: true },
+            { num: "22", name: "xiaoxiao", isMale: true, isEnglish: true, isDriver: false, hasCar: false, active: true },
+            { num: "23", name: "Cong Nguyen (Charles)", isMale: true, isEnglish: true, isDriver: false, hasCar: false, active: true },
+            { num: "24", name: "Jincheng Guo (Eric)", isMale: true, isEnglish: true, isDriver: false, hasCar: false, active: true },
+            { num: "25", name: "Shunxiang Wu", isMale: true, isEnglish: false, isDriver: false, hasCar: false, active: true }
         ];
 
-        let currentScheduleData = [];
+        const SHIFT_DEFS = { "0-3": "00:00-03:00", "3-6": "03:00-06:00", "6-12": "06:00-12:00", "12-18": "12:00-18:00", "18-24": "18:00-00:00" };
+        let currentSchedule = []; 
+        let historyGlobal = {};
+        let editingIndex = -1;
 
-        function initControls() {
-            const daysInput = document.getElementById('daysInput');
-            const days = parseInt(daysInput.value) || 1;
-            const startDaySelect = document.getElementById('startDayInput');
-            const startTimeSelect = document.getElementById('startTimeInput');
-            
-            const prevDayValue = startDaySelect.value;
-            startDaySelect.innerHTML = '';
-            for(let i=1; i<=days; i++) {
-                const opt = document.createElement('option');
-                opt.value = i;
-                opt.textContent = `Day ${i}`;
-                if(i == prevDayValue) opt.selected = true;
-                startDaySelect.appendChild(opt);
-            }
-
-            if (startTimeSelect.innerHTML === '') {
-                TIME_SLOTS.forEach((slot, index) => {
-                    const opt = document.createElement('option');
-                    opt.value = index;
-                    opt.textContent = slot.label;
-                    if(index === 3) opt.selected = true;
-                    startTimeSelect.appendChild(opt);
+        function init() {
+            const today = new Date();
+            const end = new Date(today); end.setDate(today.getDate() + 4);
+            document.getElementById('startDate').valueAsDate = today;
+            document.getElementById('endDate').valueAsDate = end;
+            renderSelectionPanel();
+            document.getElementById('openSettingsBtn').addEventListener('click', openSettings);
+            document.getElementById('generateBtn').addEventListener('click', generateFullSchedule);
+            document.querySelectorAll('#busPeriods .time-pill').forEach(pill => {
+                pill.addEventListener('click', () => {
+                    document.querySelectorAll('#busPeriods .time-pill').forEach(p => p.classList.remove('selected'));
+                    pill.classList.add('selected');
                 });
-            }
-        }
-
-        document.getElementById('daysInput').addEventListener('input', initControls);
-        window.onload = initControls;
-
-        function isSequential(res, id1, id2) {
-            if (res.length === 0) return false;
-            const lastEntry = res[res.length - 1];
-            if (lastEntry.skipped) return false;
-            const lastPlayers = lastEntry.players;
-            return lastPlayers && lastPlayers.some(p => p.num === id1 || p.num === id2);
-        }
-
-        function countSameSlotRepeats(res, slotLabel, id1, id2) {
-            return res.filter(item => 
-                !item.skipped && 
-                item.slot.label === slotLabel && 
-                item.players.some(p => p.num === id1 || p.num === id2)
-            ).length;
-        }
-
-        document.getElementById('generateBtn').onclick = function() {
-            const days = parseInt(document.getElementById('daysInput').value) || 1;
-            const startDay = parseInt(document.getElementById('startDayInput').value);
-            const startTimeIdx = parseInt(document.getElementById('startTimeInput').value);
-            const rawInput = document.getElementById('peopleInput').value;
-            
-            const nums = rawInput.split(/[,，\n\r\s]+/).map(s => s.trim()).filter(s => s && NAME_MAP[s]);
-            
-            const activePeople = nums
-                .filter(n => !AVOID.includes(n))
-                .map(n => ({
-                    num: n,
-                    name: NAME_MAP[n],
-                    isMale: MALES.includes(n),
-                    isEnglish: ENGLISH_SPEAKERS.includes(n),
-                    canEnglish: !NON_ENGLISH.includes(n),
-                    isDriver: !NON_DRIVERS.includes(n),
-                    needsEnglishPartner: NEEDS_ENG.includes(n)
-                }));
-
-            currentScheduleData = [];
-            let dailyHistory = {}; 
-
-            for (let d = 1; d <= days; d++) {
-                dailyHistory[d] = {};
-                for (let tIdx = 0; tIdx < TIME_SLOTS.length; tIdx++) {
-                    const slot = TIME_SLOTS[tIdx];
-                    
-                    if (d < startDay || (d === startDay && tIdx < startTimeIdx)) {
-                        currentScheduleData.push({ day: d, slot, players: [], skipped: true });
-                        continue;
-                    }
-
-                    let candidates = [];
-                    for (let i = 0; i < activePeople.length; i++) {
-                        for (let j = i + 1; j < activePeople.length; j++) {
-                            const p1 = activePeople[i];
-                            const p2 = activePeople[j];
-
-                            let violations = 0;
-
-                            // Rule: Try not to put english in 12-18, 18-24
-                            if (slot.value === "12-18" || slot.value === "18-24") {
-                                if (p1.isEnglish) violations += 1000;
-                                if (p2.isEnglish) violations += 1000;
-                            }
-
-                            // Rule: dont put driver for the first day whole day 
-                            // and the last day's 18-24
-                            const isFirstDay = (d === 1);
-                            const isLastShiftOfLastDay = (d === days && slot.value === "18-24");
-                            if (isFirstDay || isLastShiftOfLastDay) {
-                                if (p1.isDriver || p2.isDriver) violations += 10000; 
-                            }
-
-                            // Normal requirement: 06:00-12:00 needs 2 drivers
-                            if (slot.value === "6-12") {
-                                if (!(p1.isDriver && p2.isDriver)) violations += 5000;
-                            }
-
-                            if (isSequential(currentScheduleData, p1.num, p2.num)) violations += 500;
-                            
-                            const sameSlotRepeats = countSameSlotRepeats(currentScheduleData, slot.label, p1.num, p2.num);
-                            violations += sameSlotRepeats * 800;
-
-                            if ((dailyHistory[d][p1.num] || 0) >= 2) violations += 200;
-                            if ((dailyHistory[d][p2.num] || 0) >= 2) violations += 200;
-                            
-                            if (slot.isNight && !((p1.isMale && !p2.isMale) || (!p1.isMale && p2.isMale))) violations += 40;
-                            if ((p1.needsEnglishPartner && !p2.canEnglish) || (p2.needsEnglishPartner && !p1.canEnglish)) violations += 30;
-
-                            // Driver preference for late shifts (if not restricted)
-                            if (slot.value !== "6-12" && !isFirstDay && !isLastShiftOfLastDay) {
-                                if (["12-18", "18-24"].includes(slot.value) && !(p1.isDriver || p2.isDriver)) {
-                                    violations += 50; 
-                                }
-                            }
-
-                            if ((p1.num === "10" || p2.num === "10") && tIdx < 3) violations += 20;
-                            if ((p1.num === "24" || p2.num === "24") && d !== 4) violations += 20;
-                            if ((p1.num === "2" || p2.num === "2") && slot.isNight) violations += 20;
-
-                            candidates.push({ pair: [p1, p2], violations });
-                        }
-                    }
-
-                    candidates.sort((a, b) => {
-                        if (a.violations !== b.violations) return a.violations - b.violations;
-                        const workloadA = (dailyHistory[d][a.pair[0].num] || 0) + (dailyHistory[d][a.pair[1].num] || 0);
-                        const workloadB = (dailyHistory[d][b.pair[0].num] || 0) + (dailyHistory[d][b.pair[1].num] || 0);
-                        return workloadA - workloadB;
-                    });
-
-                    const winner = candidates[0] ? candidates[0].pair : [];
-                    const hadViolations = candidates[0] ? candidates[0].violations > 0 : true;
-                    
-                    currentScheduleData.push({ 
-                        day: d, 
-                        slot, 
-                        players: winner, 
-                        skipped: winner.length === 0,
-                        optimized: !hadViolations 
-                    });
-
-                    if(winner.length > 0) {
-                        dailyHistory[d][winner[0].num] = (dailyHistory[d][winner[0].num] || 0) + 1;
-                        dailyHistory[d][winner[1].num] = (dailyHistory[d][winner[1].num] || 0) + 1;
-                    }
-                }
-            }
-            renderSchedule(currentScheduleData, days);
-            document.getElementById('exportBtn').classList.remove('hidden');
-        };
-
-        function renderSchedule(data, totalDays) {
-            const container = document.getElementById('scheduleContainer');
-            container.innerHTML = '';
-            container.className = 'lg:col-span-3 space-y-6';
-
-            for (let d = 1; d <= totalDays; d++) {
-                const dayData = data.filter(i => i.day === d);
-                let dayHtml = `
-                    <div class="card overflow-hidden border-slate-200 shadow-sm">
-                        <div class="bg-slate-800 text-white px-6 py-4 flex items-center justify-between">
-                            <h3 class="font-bold text-sm tracking-widest uppercase mx-auto">Day ${d}</h3>
-                        </div>
-                        <div class="grid grid-cols-1 md:grid-cols-5 divide-y md:divide-y-0 md:divide-x divide-slate-100">
-                `;
-
-                dayData.forEach(item => {
-                    dayHtml += `
-                        <div class="p-4 slot-card ${item.skipped ? 'skipped' : ''}">
-                            <div class="text-[10px] font-black text-slate-400 mb-3 border-b border-slate-50 pb-1 uppercase tracking-tighter">${item.slot.label}</div>
-                            <div class="space-y-2">
-                                ${item.players.length > 0 ? item.players.map(p => `
-                                    <div class="px-3 py-2 rounded-xl text-xs font-bold flex flex-col shadow-sm border ${!item.optimized ? 'bg-indigo-50/50 border-indigo-100 text-slate-700' : 'bg-white border-slate-100 text-slate-700'}">
-                                        <div class="flex justify-between items-center mb-1">
-                                            <span class="bg-slate-100 px-1.5 py-0.5 rounded text-[10px]">${p.num}</span>
-                                            <div class="flex items-center gap-1.5">
-                                                ${p.isEnglish ? '<span class="is-english text-[10px] font-black" title="English">E</span>' : ''}
-                                                <span class="${p.isMale ? 'gender-m' : 'gender-f'} text-[9px] font-black opacity-80">${p.isMale ? 'M' : 'F'}</span>
-                                                ${p.isDriver ? '<span class="is-driver text-[10px] font-black" title="Driver">D</span>' : ''}
-                                            </div>
-                                        </div>
-                                        <div class="text-[9px] leading-tight break-words text-slate-600">
-                                            ${p.name}
-                                        </div>
-                                    </div>
-                                `).join('') : '<div class="text-[10px] text-slate-300 italic py-2">--</div>'}
-                            </div>
-                        </div>
-                    `;
-                });
-
-                dayHtml += `</div></div>`;
-                container.innerHTML += dayHtml;
-            }
-        }
-
-        document.getElementById('exportBtn').onclick = function() {
-            if (currentScheduleData.length === 0) return;
-            let textContent = "BUS SCHEDULE\n====================\n\n";
-            let currentDay = -1;
-            currentScheduleData.forEach(item => {
-                if (item.skipped) return;
-                if (item.day !== currentDay) {
-                    currentDay = item.day;
-                    textContent += `\n--- DAY ${currentDay} ---\n`;
-                }
-                const players = item.players.map(p => `${p.num} [${p.name}]`).join(", ");
-                textContent += `[${item.slot.label}] : ${players || "Unassigned"}\n`;
             });
-            const blob = new Blob([textContent], { type: 'text/plain' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `Bus_Schedule.txt`;
-            a.click();
-            window.URL.revokeObjectURL(url);
-        };
+            document.querySelectorAll('#securityPeriods .time-pill').forEach(pill => {
+                pill.addEventListener('click', () => pill.classList.toggle('selected'));
+            });
+        }
+
+        function renderSelectionPanel() {
+            const list = document.getElementById('selectionList');
+            const activePool = members.filter(m => m.active);
+            document.getElementById('memberCounter').textContent = activePool.length;
+            list.innerHTML = members.map((m, i) => `
+                <div class="member-item p-2.5 bg-white rounded-xl border border-slate-100 ${m.active ? 'active' : 'inactive'}" onclick="toggleActive(${i})">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="text-[9px] font-black text-slate-300">#${m.num}</span>
+                            <p class="text-[10px] font-bold text-slate-700 truncate w-32">${m.name}</p>
+                        </div>
+                        <div class="flex gap-1">
+                            <span class="badge ${m.isMale ? 'badge-m' : 'badge-f'}">${m.isMale ? 'M' : 'F'}</span>
+                            ${m.isEnglish ? '<span class="badge badge-e">E</span>' : ''}
+                            ${m.isDriver ? '<span class="badge badge-d">D</span>' : ''}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function toggleActive(i) {
+            members[i].active = !members[i].active;
+            renderSelectionPanel();
+        }
+
+        function generateFullSchedule() {
+            const startStr = document.getElementById('startDate').value;
+            const endStr = document.getElementById('endDate').value;
+            if (!startStr || !endStr) return;
+
+            const start = new Date(startStr);
+            const end = new Date(endStr);
+            const activePool = members.filter(m => m.active);
+            if (activePool.length < 4) return;
+
+            const selectedArrival = Array.from(document.querySelectorAll('#busPeriods .time-pill.selected')).map(el => el.dataset.period);
+            const selectedSecurity = Array.from(document.querySelectorAll('#securityPeriods .time-pill.selected')).map(el => el.dataset.period);
+            
+            currentSchedule = [];
+            historyGlobal = {};
+            activePool.forEach(p => historyGlobal[p.num] = 0);
+
+            let current = new Date(start);
+            let dayIdx = 0;
+
+            while (current <= end) {
+                let dayData = { date: new Date(current), bus: [], sec: [], busy: { "0-3": [], "3-6": [], "6-12": [], "12-18": [], "18-24": [] } };
+                
+                const busPeriods = (dayIdx === 0) ? selectedArrival : Object.keys(SHIFT_DEFS);
+                busPeriods.forEach(key => {
+                    const players = pickPair(activePool, SHIFT_DEFS[key], dayData.busy[key]);
+                    dayData.bus.push({ key, time: SHIFT_DEFS[key], players, type: 'bus' });
+                    players.forEach(p => dayData.busy[key].push(p.num));
+                });
+
+                selectedSecurity.forEach(key => {
+                    const players = pickPair(activePool, SHIFT_DEFS[key], dayData.busy[key], true);
+                    dayData.sec.push({ key, time: SHIFT_DEFS[key], players, type: 'sec' });
+                    players.forEach(p => dayData.busy[key].push(p.num));
+                });
+
+                currentSchedule.push(dayData);
+                current.setDate(current.getDate() + 1);
+                dayIdx++;
+            }
+            renderScheduleDisplay();
+        }
+
+        function rerollSlot(dayIdx, type, slotIdx) {
+            const dayData = currentSchedule[dayIdx];
+            const activePool = members.filter(m => m.active);
+            const slot = type === 'bus' ? dayData.bus[slotIdx] : dayData.sec[slotIdx];
+            
+            // Decrement old player history
+            slot.players.forEach(p => { if(p.num !== "?") historyGlobal[p.num] = Math.max(0, historyGlobal[p.num] - 1); });
+            
+            // Pick new ones
+            const otherType = type === 'bus' ? 'sec' : 'bus';
+            const concurrentOccupants = (dayData[otherType].find(s => s.key === slot.key)?.players || []).map(p => p.num);
+            slot.players = pickPair(activePool, slot.time, concurrentOccupants, type === 'sec');
+            renderScheduleDisplay();
+        }
+
+        function rerollDay(dayIdx) {
+            const dayData = currentSchedule[dayIdx];
+            const activePool = members.filter(m => m.active);
+            
+            [...dayData.bus, ...dayData.sec].forEach(s => {
+                s.players.forEach(p => { if(p.num !== "?") historyGlobal[p.num] = Math.max(0, historyGlobal[p.num] - 1); });
+            });
+
+            dayData.bus = []; dayData.sec = [];
+            dayData.busy = { "0-3": [], "3-6": [], "6-12": [], "12-18": [], "18-24": [] };
+
+            const isDay1 = dayIdx === 0;
+            const busPeriods = isDay1 ? Array.from(document.querySelectorAll('#busPeriods .time-pill.selected')).map(el => el.dataset.period) : Object.keys(SHIFT_DEFS);
+            const secPeriods = Array.from(document.querySelectorAll('#securityPeriods .time-pill.selected')).map(el => el.dataset.period);
+
+            busPeriods.forEach(key => {
+                const players = pickPair(activePool, SHIFT_DEFS[key], dayData.busy[key]);
+                dayData.bus.push({ key, time: SHIFT_DEFS[key], players, type: 'bus' });
+                players.forEach(p => dayData.busy[key].push(p.num));
+            });
+            secPeriods.forEach(key => {
+                const players = pickPair(activePool, SHIFT_DEFS[key], dayData.busy[key], true);
+                dayData.sec.push({ key, time: SHIFT_DEFS[key], players, type: 'sec' });
+                players.forEach(p => dayData.busy[key].push(p.num));
+            });
+
+            renderScheduleDisplay();
+        }
+
+        function pickPair(pool, time, exclusionList, isSecurity = false) {
+            let options = [];
+            const available = pool.filter(p => !exclusionList.includes(p.num));
+            if (available.length < 2) return [{name: "Conflict", num: "?"}, {name: "Conflict", num: "?"}];
+
+            for (let i = 0; i < available.length; i++) {
+                for (let j = i + 1; j < available.length; j++) {
+                    const p1 = available[i]; const p2 = available[j];
+                    let score = (historyGlobal[p1.num] + historyGlobal[p2.num]) * 20;
+                    const isNight = time.startsWith("00:") || time.startsWith("03:") || time.startsWith("18:");
+                    if (isNight && p1.isMale === p2.isMale) score += 50;
+                    if (!p1.isDriver && !p2.isDriver) score += 70;
+                    if (!p1.isEnglish && !p2.isEnglish) score += 100;
+                    options.push({ pair: [p1, p2], score: score + Math.random() * 10 });
+                }
+            }
+            options.sort((a, b) => a.score - b.score);
+            const winner = options[0].pair;
+            winner.forEach(p => { if(p.num !== "?") historyGlobal[p.num]++; });
+            return winner;
+        }
+
+        function renderScheduleDisplay() {
+            const container = document.getElementById('scheduleContainer');
+            container.innerHTML = currentSchedule.map((day, dIdx) => `
+                <div class="card overflow-hidden">
+                    <div class="bg-slate-900 px-6 py-3 flex justify-between items-center text-white">
+                        <div class="flex items-center gap-4">
+                            <span class="text-xs font-black uppercase tracking-widest">${day.date.toDateString()}</span>
+                            <button onclick="rerollDay(${dIdx})" class="text-[9px] font-black text-indigo-400 border border-indigo-400/30 px-2 py-0.5 rounded hover:bg-indigo-400 hover:text-white transition-all uppercase">Reroll Day</button>
+                        </div>
+                        <span class="text-[9px] opacity-50 uppercase font-bold">Duty Roster</span>
+                    </div>
+                    <div class="p-4 space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                            ${day.bus.map((s, sIdx) => renderSlotUI(s, dIdx, 'bus', sIdx)).join('')}
+                        </div>
+                        ${day.sec.length > 0 ? `
+                            <div class="border-t pt-4">
+                                <h4 class="text-[9px] font-black text-indigo-400 uppercase mb-3 tracking-widest">Security Duties</h4>
+                                <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                                    ${day.sec.map((s, sIdx) => renderSlotUI(s, dIdx, 'sec', sIdx)).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderSlotUI(s, dIdx, type, sIdx) {
+            return `
+                <div class="${s.type === 'sec' ? 'bg-indigo-50 border-indigo-200' : 'bg-slate-50 border-slate-100'} border rounded-xl p-3 slot-card flex flex-col justify-between">
+                    <div class="flex justify-between items-start mb-2">
+                        <p class="text-[10px] font-black ${s.type === 'sec' ? 'text-indigo-600' : 'text-slate-600'}">${s.time}</p>
+                        <button onclick="rerollSlot(${dIdx}, '${type}', ${sIdx})" class="reroll-btn p-1 bg-white border border-slate-200 rounded-md text-slate-400 hover:text-indigo-600 hover:border-indigo-600 shadow-sm transition-all" title="Reroll this slot">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+                        </button>
+                    </div>
+                    <div class="space-y-1.5">
+                        ${s.players.map(p => `
+                            <div class="bg-white p-2 rounded-lg border border-slate-200 flex justify-between items-center shadow-sm">
+                                <span class="text-[10px] font-bold truncate">${p.name}</span>
+                                <div class="flex gap-0.5 shrink-0">
+                                    <span class="badge ${p.isMale ? 'badge-m' : 'badge-f'} scale-[0.7] -mx-0.5">${p.isMale ? 'M' : 'F'}</span>
+                                    ${p.isEnglish ? '<span class="badge badge-e scale-[0.7] -mx-0.5">E</span>' : ''}
+                                    ${p.isDriver ? '<span class="badge badge-d scale-[0.7] -mx-0.5" title="Driver">D</span>' : ''}
+                                    ${p.hasCar ? '<span class="badge badge-c scale-[0.7] -mx-0.5" title="Has Car">C</span>' : ''}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function openSettings() { document.getElementById('settingsModal').classList.remove('hidden'); renderMasterTable(); }
+        function closeSettings() { document.getElementById('settingsModal').classList.add('hidden'); renderSelectionPanel(); }
+        function showMemberEditor(index = -1) {
+            editingIndex = index;
+            const modal = document.getElementById('editorModal');
+            if (index === -1) {
+                document.getElementById('editName').value = "";
+                document.getElementById('editId').value = (members.length + 1).toString();
+                document.getElementById('editEnglish').checked = true;
+                document.getElementById('editDriver').checked = false;
+                document.getElementById('editCar').checked = false;
+            } else {
+                const m = members[index];
+                document.getElementById('editName').value = m.name;
+                document.getElementById('editId').value = m.num;
+                document.getElementById('editGender').value = m.isMale.toString();
+                document.getElementById('editEnglish').checked = m.isEnglish;
+                document.getElementById('editDriver').checked = m.isDriver;
+                document.getElementById('editCar').checked = m.hasCar;
+            }
+            modal.classList.remove('hidden');
+        }
+        function closeEditor() { document.getElementById('editorModal').classList.add('hidden'); }
+        function saveMember() {
+            const memberData = {
+                num: document.getElementById('editId').value,
+                name: document.getElementById('editName').value,
+                isMale: document.getElementById('editGender').value === 'true',
+                isEnglish: document.getElementById('editEnglish').checked,
+                isDriver: document.getElementById('editDriver').checked,
+                hasCar: document.getElementById('editCar').checked,
+                active: editingIndex === -1 ? true : members[editingIndex].active
+            };
+            if (editingIndex === -1) members.push(memberData);
+            else members[editingIndex] = memberData;
+            closeEditor(); renderMasterTable();
+        }
+        function renderMasterTable() {
+            const body = document.getElementById('masterTableBody');
+            body.innerHTML = members.map((m, i) => `
+                <tr class="hover:bg-indigo-50/30 text-[11px]">
+                    <td class="px-4 py-3 font-black text-slate-400">#${m.num}</td>
+                    <td class="px-4 py-3 font-bold">${m.name}</td>
+                    <td class="px-4 py-3 text-center"><span class="badge ${m.isMale ? 'badge-m' : 'badge-f'}">${m.isMale ? 'Male' : 'Female'}</span></td>
+                    <td class="px-4 py-3 text-center">${m.isEnglish ? '✅' : '❌'}</td>
+                    <td class="px-4 py-3 text-center">${m.isDriver ? '✅' : '❌'}</td>
+                    <td class="px-4 py-3 text-center">${m.hasCar ? '✅' : '❌'}</td>
+                    <td class="px-4 py-3 text-right">
+                        <button onclick="showMemberEditor(${i})" class="text-indigo-600 font-black uppercase text-[8px] mr-2">Edit</button>
+                        <button onclick="members.splice(${i}, 1); renderMasterTable()" class="text-rose-500 font-black uppercase text-[8px]">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        init();
     </script>
 </body>
 </html>
