@@ -3,42 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shift Master Enterprise</title>
-    
+    <title>Shift Master Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://unpkg.com/lucide-react@latest"></script>
-
+    <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
     <style>
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 10px; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
     </style>
 </head>
 <body class="bg-[#F1F5F9]">
     <div id="root"></div>
 
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, collection, onSnapshot, addDoc, deleteDoc, updateDoc, writeBatch, query } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+      import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+      import { getFirestore, doc, setDoc, collection, onSnapshot, addDoc, deleteDoc, updateDoc, writeBatch, query } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        window.FB = { 
-            initializeApp, getAuth, signInAnonymously, onAuthStateChanged,
-            getFirestore, doc, setDoc, collection, onSnapshot, addDoc, deleteDoc, updateDoc, writeBatch, query 
-        };
-    </script>
+      window.FB = { 
+          initializeApp, getAuth, signInAnonymously, onAuthStateChanged,
+          getFirestore, doc, setDoc, collection, onSnapshot, addDoc, deleteDoc, updateDoc, writeBatch, query 
+      };
+      
+      // Signal that Firebase is ready
+      window.dispatchEvent(new Event('firebase-ready'));
+  </script>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
-        const { 
-            Shield, Calendar, Trash2, Edit2, X, RefreshCcw, 
-            UserPlus, Database, RotateCw, Lock, Clock, Languages, Car, UserCheck, Plus, AlertCircle 
-        } = lucideReact;
+        const Icon = ({ name, size = 16, className = "" }) => {
+    useEffect(() => {
+        if (window.lucide) {
+            window.lucide.createIcons();
+        }
+    }, [name]);
+
+    return (
+        <i 
+            data-lucide={name} 
+            className={className} 
+            style={{ 
+                width: size, 
+                height: size, 
+                display: 'inline-flex', 
+                alignItems: 'center', 
+                justifyContent: 'center' 
+            }}
+        ></i>
+    );
+};
 
         const firebaseConfig = {
             apiKey: "AIzaSyCLKH_gbj1AG1m0q4ilHwX8QH8LkZKIfbc",
@@ -55,33 +69,34 @@
         const SHIFT_DEFS = { "0-3": "00:00-03:00", "3-6": "03:00-06:00", "6-12": "06:00-12:00", "12-18": "12:00-18:00", "18-24": "18:00-00:00" };
 
         const INITIAL_ROSTER = [
-            { num: 1, name: "Qing Wang", isMale: false, isEnglish: true, isDriver: true, hasCar: true },
-            { num: 2, name: "Hao Wang (Diana)", isMale: false, isEnglish: true, isDriver: false, hasCar: false },
-            { num: 3, name: "Ling Young", isMale: false, isEnglish: true, isDriver: true, hasCar: false },
-            { num: 4, name: "Ma Lan (Sophia Li)", isMale: false, isEnglish: true, isDriver: true, hasCar: true },
-            { num: 5, name: "Tham Nguyen (Mina)", isMale: false, isEnglish: true, isDriver: true, hasCar: false },
-            { num: 6, name: "Qing Han", isMale: false, isEnglish: true, isDriver: true, hasCar: false },
-            { num: 7, name: "Le Thi Oanh (Aria)", isMale: false, isEnglish: true, isDriver: false, hasCar: false },
-            { num: 8, name: "Li Han", isMale: false, isEnglish: false, isDriver: false, hasCar: false },
-            { num: 9, name: "Ping Jiang", isMale: false, isEnglish: false, isDriver: true, hasCar: false },
-            { num: 10, name: "Hongjun Zheng (Lucinda)", isMale: false, isEnglish: false, isDriver: false, hasCar: false },
-            { num: 11, name: "Dongxia Sun", isMale: false, isEnglish: false, isDriver: true, hasCar: false },
-            { num: 12, name: "Xuemei Song (Sophie)", isMale: false, isEnglish: false, isDriver: false, hasCar: false },
-            { num: 13, name: "Deyun Xia", isMale: false, isEnglish: false, isDriver: false, hasCar: false },
-            { num: 14, name: "Lily Jia", isMale: false, isEnglish: true, isDriver: true, hasCar: true },
-            { num: 15, name: "Tuyet Nhung (Adela)", isMale: false, isEnglish: true, isDriver: true, hasCar: false },
-            { num: 16, name: "Thi Lien Huong (Lotus)", isMale: false, isEnglish: true, isDriver: true, hasCar: false },
-            { num: 17, name: "Ling Wu (Cassie)", isMale: false, isEnglish: true, isDriver: true, hasCar: false },
-            { num: 18, name: "Yongxian Li (Lynna)", isMale: false, isEnglish: true, isDriver: true, hasCar: true },
-            { num: 19, name: "Xiaodong Xu (William)", isMale: true, isEnglish: true, isDriver: true, hasCar: true },
-            { num: 20, name: "Larrison Manygoats", isMale: true, isEnglish: true, isDriver: true, hasCar: true },
-            { num: 21, name: "Zhiyuan Xie (Harry)", isMale: true, isEnglish: true, isDriver: true, hasCar: true },
-            { num: 22, name: "xiaoxiao", isMale: true, isEnglish: true, isDriver: false, hasCar: false },
-            { num: 23, name: "Cong Nguyen (Charles)", isMale: true, isEnglish: true, isDriver: false, hasCar: false },
-            { num: 24, name: "Jincheng Guo (Eric)", isMale: true, isEnglish: true, isDriver: false, hasCar: false },
-            { num: 25, name: "Shunxiang Wu", isMale: true, isEnglish: false, isDriver: false, hasCar: false }
-        ];
+          { num: 1, name: "Qing Wang", isMale: false, isEnglish: true, isDriver: true, hasCar: true },
+          { num: 2, name: "Hao Wang (Diana)", isMale: false, isEnglish: true, isDriver: false, hasCar: false },
+          { num: 3, name: "Ling Young", isMale: false, isEnglish: true, isDriver: true, hasCar: false },
+          { num: 4, name: "Ma Lan (Sophia Li)", isMale: false, isEnglish: true, isDriver: true, hasCar: true },
+          { num: 5, name: "Tham Nguyen (Mina)", isMale: false, isEnglish: true, isDriver: true, hasCar: false },
+          { num: 6, name: "Qing Han", isMale: false, isEnglish: true, isDriver: true, hasCar: false },
+          { num: 7, name: "Le Thi Oanh (Aria)", isMale: false, isEnglish: true, isDriver: false, hasCar: false },
+          { num: 8, name: "Li Han", isMale: false, isEnglish: false, isDriver: false, hasCar: false },
+          { num: 9, name: "Ping Jiang", isMale: false, isEnglish: false, isDriver: true, hasCar: false },
+          { num: 10, name: "Hongjun Zheng (Lucinda)", isMale: false, isEnglish: false, isDriver: false, hasCar: false },
+          { num: 11, name: "Dongxia Sun", isMale: false, isEnglish: false, isDriver: true, hasCar: false },
+          { num: 12, name: "Xuemei Song (Sophie)", isMale: false, isEnglish: false, isDriver: false, hasCar: false },
+          { num: 13, name: "Deyun Xia", isMale: false, isEnglish: false, isDriver: false, hasCar: false },
+          { num: 14, name: "Lily Jia", isMale: false, isEnglish: true, isDriver: true, hasCar: true },
+          { num: 15, name: "Tuyet Nhung (Adela)", isMale: false, isEnglish: true, isDriver: true, hasCar: false },
+          { num: 16, name: "Thi Lien Huong (Lotus)", isMale: false, isEnglish: true, isDriver: true, hasCar: false },
+          { num: 17, name: "Ling Wu (Cassie)", isMale: false, isEnglish: true, isDriver: true, hasCar: false },
+          { num: 18, name: "Yongxian Li (Lynna)", isMale: false, isEnglish: true, isDriver: true, hasCar: true },
+          { num: 19, name: "Xiaodong Xu (William)", isMale: true, isEnglish: true, isDriver: true, hasCar: true },
+          { num: 20, name: "Larrison Manygoats", isMale: true, isEnglish: true, isDriver: true, hasCar: true },
+          { num: 21, name: "Zhiyuan Xie (Harry)", isMale: true, isEnglish: true, isDriver: true, hasCar: true },
+          { num: 22, name: "xiaoxiao", isMale: true, isEnglish: true, isDriver: false, hasCar: false },
+          { num: 23, name: "Cong Nguyen (Charles)", isMale: true, isEnglish: true, isDriver: false, hasCar: false },
+          { num: 24, name: "Jincheng Guo (Eric)", isMale: true, isEnglish: true, isDriver: false, hasCar: false },
+          { num: 25, name: "Shunxiang Wu", isMale: true, isEnglish: false, isDriver: false, hasCar: false }
+      ];
 
+        // Initialize Firebase using the window object attached earlier
         const app = FB.initializeApp(firebaseConfig);
         const auth = FB.getAuth(app);
         const db = FB.getFirestore(app);
@@ -138,22 +153,28 @@
                         setMembers(snap.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => a.num - b.num));
                     }
                 });
-                const unsubR = FB.onSnapshot(rRef, (snap) => setSecRules(snap.docs.map(d => ({ ...d.data(), id: d.id }))));
-                const unsubS = FB.onSnapshot(sRef, (snap) => { if (snap.exists()) setSchedule(snap.data()); });
+
+                const unsubR = FB.onSnapshot(rRef, (snap) => {
+                    setSecRules(snap.docs.map(d => ({ ...d.data(), id: d.id })));
+                });
+
+                const unsubS = FB.onSnapshot(sRef, (snap) => {
+                    if (snap.exists()) setSchedule(snap.data());
+                });
 
                 return () => { unsubM(); unsubR(); unsubS(); };
             }, [user, isAuth]);
 
             const generateSchedule = async () => {
                 const pool = members.filter(m => m.inPool);
-                if (pool.length < 8) { alert("Add 8+ people to the registry first."); return; }
+                if (pool.length < 8) { alert("Need 8+ members in registry pool."); return; }
+                
                 setLoading(true);
-
                 const start = new Date(dateRange.start + "T00:00:00");
                 const end = new Date(dateRange.end + "T00:00:00");
                 const generatedDays = [];
+                
                 let dIter = new Date(start);
-
                 while (dIter <= end) {
                     const dateISO = dIter.toISOString().split('T')[0];
                     const dailyBusy = new Set();
@@ -180,9 +201,9 @@
                     
                     SHIFT_ORDER.slice(startIndex).forEach(key => {
                         const available = pool.filter(p => !dailyBusy.has(p.num));
-                        let players = available.length >= 2 ? [available[0], available[1]] : [{ name: 'VACANT', num:'?' }, { name: 'VACANT', num:'?' }];
+                        let shiftPlayers = available.length >= 2 ? [available[0], available[1]] : [{ name: 'VACANT' }, { name: 'VACANT' }];
                         if (available.length >= 2) { dailyBusy.add(available[0].num); dailyBusy.add(available[1].num); }
-                        currentDay.shifts.push({ time: SHIFT_DEFS[key], players });
+                        currentDay.shifts.push({ time: SHIFT_DEFS[key], players: shiftPlayers });
                     });
 
                     generatedDays.push(currentDay);
@@ -228,13 +249,13 @@
 
             if (!isAuth) {
                 return (
-                    <div class="min-h-screen bg-slate-950 flex items-center justify-center p-6">
-                        <div class="bg-white p-10 rounded-[2.5rem] shadow-2xl w-full max-w-md animate-fade-in">
-                            <Lock size={40} class="mx-auto text-indigo-600 mb-6" />
-                            <h1 class="text-center text-xl font-black uppercase tracking-widest mb-8">Access Portal</h1>
-                            <form onSubmit={(e) => { e.preventDefault(); if (passInput === LOGIN_PASSWORD) { setIsAuth(true); localStorage.setItem(`auth_${appId}`, LOGIN_PASSWORD); }}} class="space-y-4">
-                                <input type="password" value={passInput} onChange={(e) => setPassInput(e.target.value)} placeholder="Enter Pin" class="w-full bg-slate-100 p-4 rounded-2xl text-center font-bold outline-none ring-2 ring-transparent focus:ring-indigo-600" />
-                                <button class="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-black transition-colors">Unlock Console</button>
+                    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
+                        <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl w-full max-w-md">
+                          <Icon name="lock" size={40} className="mx-auto text-indigo-600 mb-6" />
+                            <h1 className="text-center text-xl font-black uppercase tracking-widest mb-8">Access Portal</h1>
+                            <form onSubmit={(e) => { e.preventDefault(); if (passInput === LOGIN_PASSWORD) { setIsAuth(true); localStorage.setItem(`auth_${appId}`, LOGIN_PASSWORD); }}} className="space-y-4">
+                                <input type="password" value={passInput} onChange={(e) => setPassInput(e.target.value)} placeholder="Enter Pin" className="w-full bg-slate-100 p-4 rounded-2xl text-center font-bold outline-none ring-2 ring-transparent focus:ring-indigo-600" />
+                                <button className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs">Unlock</button>
                             </form>
                         </div>
                     </div>
@@ -242,144 +263,134 @@
             }
 
             return (
-                <div class="min-h-screen bg-[#F1F5F9] pb-20 text-slate-900">
-                    <div class="max-w-7xl mx-auto p-4 lg:p-8">
-                        <header class="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm mb-8 flex flex-col md:flex-row items-center justify-between gap-6 animate-fade-in">
-                            <div class="flex items-center gap-4">
-                                <div class="bg-slate-900 p-3 rounded-2xl text-white shadow-lg"><Shield size={20} /></div>
+                <div className="min-h-screen bg-[#F1F5F9] pb-20 text-slate-900">
+                    <div className="max-w-7xl mx-auto p-4 lg:p-8">
+                        <header className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm mb-8 flex flex-col md:flex-row items-center justify-between gap-6">
+                            <div className="flex items-center gap-4">
+                                <div className="bg-slate-900 p-3 rounded-2xl text-white"><Icon name="shield" size={20} /></div>
                                 <div>
-                                    <h1 class="text-xl font-black uppercase tracking-tighter">Shift Master <span class="text-indigo-600">Enterprise</span></h1>
-                                    <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">v4.0 Final • All-in-One</p>
+                                    <h1 className="text-xl font-black uppercase tracking-tighter">Shift Master <span className="text-indigo-600">Enterprise</span></h1>
+                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Version 4.0 // Single HTML</p>
                                 </div>
                             </div>
-                            <div class="flex gap-2 w-full md:w-auto">
-                                <button onClick={() => setIsModalOpen(true)} class="flex-1 bg-slate-100 px-5 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-slate-200 transition-all">
-                                    <Database size={14} /> Registry
+                            <div className="flex gap-2">
+                                <button onClick={() => setIsModalOpen(true)} className="bg-slate-100 px-5 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:bg-slate-200 transition-colors">
+                                  <Icon name="database" size={14} /> Registry
                                 </button>
-                                <button onClick={generateSchedule} class="flex-1 bg-indigo-600 text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg flex items-center justify-center gap-2 hover:bg-indigo-700 transition-all">
-                                    {loading ? <RotateCw class="animate-spin" size={14} /> : <RefreshCcw size={14} />} Sync
+                                <button onClick={generateSchedule} className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg flex items-center gap-2 hover:bg-indigo-700 transition-all">
+                                    {loading ? <Icon name="rotate-cw" size={14} className="animate-spin" /> : <Icon name="refresh-ccw" size={14} />} Sync & Generate
                                 </button>
                             </div>
                         </header>
 
-                        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                            <aside class="lg:col-span-3 space-y-6">
-                                <div class="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm">
-                                    <h3 class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-6">Scheduler Range</h3>
-                                    <div class="space-y-4">
-                                        <div><label class="text-[8px] font-black text-slate-400 uppercase mb-1 block ml-1">Starts</label><input type="date" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})} class="w-full bg-slate-50 p-3 rounded-xl text-xs font-bold border" /></div>
-                                        <div><label class="text-[8px] font-black text-slate-400 uppercase mb-1 block ml-1">Ends</label><input type="date" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})} class="w-full bg-slate-50 p-3 rounded-xl text-xs font-bold border" /></div>
-                                        <div><label class="text-[8px] font-black text-slate-400 uppercase mb-1 block ml-1">Arrival Shift</label>
-                                            <select value={arrivalPeriod} onChange={e => setArrivalPeriod(e.target.value)} class="w-full bg-slate-50 p-3 rounded-xl text-xs font-bold border">
-                                                {SHIFT_ORDER.map(s => <option key={s} value={s}>{SHIFT_DEFS[s]}</option>)}
-                                            </select>
-                                        </div>
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                            <aside className="lg:col-span-3 space-y-6">
+                                <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm">
+                                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-6 block">Scheduler Range</h3>
+                                    <div className="space-y-4">
+                                        <input type="date" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})} className="w-full bg-slate-50 p-3 rounded-xl text-xs font-bold border" />
+                                        <input type="date" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})} className="w-full bg-slate-50 p-3 rounded-xl text-xs font-bold border" />
+                                        <select value={arrivalPeriod} onChange={e => setArrivalPeriod(e.target.value)} className="w-full bg-slate-50 p-3 rounded-xl text-xs font-bold border">
+                                            {SHIFT_ORDER.map(s => <option key={s} value={s}>{SHIFT_DEFS[s]}</option>)}
+                                        </select>
                                     </div>
                                 </div>
-                                <div class="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm">
-                                    <h3 class="text-[10px] font-black uppercase tracking-widest text-indigo-600 mb-6 block">Add Security Job</h3>
-                                    <form onSubmit={handleSecuritySubmit} class="space-y-4">
-                                        <input type="date" value={secForm.date} onChange={e => setSecForm({...secForm, date: e.target.value})} class="w-full p-3 bg-slate-50 rounded-xl text-xs font-bold border" />
-                                        <div class="grid grid-cols-2 gap-2">
-                                            <input type="time" value={secForm.start} onChange={e => setSecForm({...secForm, start: e.target.value})} class="bg-slate-50 p-3 rounded-xl text-[10px] font-bold border" />
-                                            <input type="time" value={secForm.end} onChange={e => setSecForm({...secForm, end: e.target.value})} class="bg-slate-50 p-3 rounded-xl text-[10px] font-bold border" />
+                                <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm">
+                                    <h3 className="text-[10px] font-black uppercase tracking-widest text-indigo-600 mb-6 block">Add Security Job</h3>
+                                    <form onSubmit={handleSecuritySubmit} className="space-y-4">
+                                        <input type="date" value={secForm.date} onChange={e => setSecForm({...secForm, date: e.target.value})} className="w-full p-3 bg-slate-50 rounded-xl text-xs font-bold border" />
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <input type="time" value={secForm.start} onChange={e => setSecForm({...secForm, start: e.target.value})} className="bg-slate-50 p-3 rounded-xl text-[10px] border" />
+                                            <input type="time" value={secForm.end} onChange={e => setSecForm({...secForm, end: e.target.value})} className="bg-slate-50 p-3 rounded-xl text-[10px] border" />
                                         </div>
-                                        <button class="w-full bg-slate-900 text-white py-3 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-black transition-colors">Add Job</button>
+                                        <button className="w-full bg-slate-900 text-white py-3 rounded-xl text-[9px] font-black uppercase tracking-widest">Add Job</button>
                                     </form>
-                                    <div class="mt-6 space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
+                                    <div className="mt-6 space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
                                         {secRules.map(r => (
-                                            <div key={r.id} class="bg-slate-50 p-2 rounded-lg flex justify-between items-center text-[9px] font-black border border-slate-100 animate-fade-in">
+                                            <div key={r.id} className="bg-slate-50 p-2 rounded-lg flex justify-between items-center text-[9px] font-black border border-slate-100">
                                                 <span>{r.date} • {r.time}</span>
-                                                <button onClick={() => FB.deleteDoc(FB.doc(db, 'artifacts', appId, 'public', 'data', 'secRules', r.id))} class="text-rose-500 hover:scale-110 transition-transform"><Trash2 size={12} /></button>
+                                                <button onClick={() => FB.deleteDoc(FB.doc(db, 'artifacts', appId, 'public', 'data', 'secRules', r.id))} className="text-rose-500"><Icon name="trash-2" size={12} /></button>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
                             </aside>
 
-                            <main class="lg:col-span-9 space-y-8">
-                                {schedule.days.length === 0 ? (
-                                    <div class="bg-white rounded-[2.5rem] border-2 border-dashed border-slate-200 p-20 text-center animate-fade-in">
-                                        <Calendar size={40} class="mx-auto text-slate-200 mb-4" />
-                                        <p class="text-slate-400 font-bold text-sm uppercase tracking-widest">No Active Schedule</p>
-                                    </div>
-                                ) : (
-                                    schedule.days.map((day) => (
-                                        <div key={day.id} class="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden animate-fade-in">
-                                            <div class="bg-slate-900 px-8 py-5 flex justify-between items-center text-white">
-                                                <h2 class="text-[11px] font-black uppercase tracking-widest">{day.label}</h2>
-                                                <div class="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]"></div>
-                                            </div>
-                                            <div class="p-8 space-y-8">
-                                                {day.security?.length > 0 && (
-                                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-6 rounded-[1.5rem] border border-slate-100">
-                                                        {day.security.map((sec, idx) => (
-                                                            <div key={idx} class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
-                                                                <div class="flex justify-between items-center mb-3">
-                                                                    <span class="text-[9px] font-black text-indigo-600 uppercase tracking-tighter">{sec.time}</span>
-                                                                    <span class="text-[7px] font-black px-1.5 py-0.5 rounded bg-slate-900 text-white uppercase tracking-widest">{sec.type}</span>
-                                                                </div>
-                                                                <div class="grid grid-cols-2 gap-2">
-                                                                    {sec.players.map((p, i) => <div key={i} class="bg-slate-50 p-2 rounded-lg text-[10px] font-bold border border-slate-100 truncate">{p.name} <Badge p={p}/></div>)}
-                                                                </div>
+                            <main className="lg:col-span-9 space-y-8">
+                                {schedule.days.map((day) => (
+                                    <div key={day.id} className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
+                                        <div className="bg-slate-900 px-8 py-5 flex justify-between items-center text-white">
+                                            <h2 className="text-[11px] font-black uppercase tracking-widest">{day.label}</h2>
+                                            <div className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]"></div>
+                                        </div>
+                                        <div className="p-8 space-y-8">
+                                            {day.security?.length > 0 && (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-6 rounded-[1.5rem]">
+                                                    {day.security.map((sec, idx) => (
+                                                        <div key={idx} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                                                            <div className="flex justify-between items-center mb-3">
+                                                                <span className="text-[9px] font-black text-indigo-600">{sec.time}</span>
+                                                                <span className="text-[7px] font-black px-1.5 py-0.5 rounded bg-slate-900 text-white">{sec.type}</span>
                                                             </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                                                    {day.shifts.map((shift, idx) => (
-                                                        <div key={idx} class="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                                                            <div class="flex items-center gap-1.5 mb-2 opacity-50 text-[8px] font-black uppercase tracking-widest"><Clock size={10} /> {shift.time}</div>
-                                                            {shift.players.map((p, i) => <div key={i} class="bg-white p-2 rounded-lg text-[9px] font-bold mb-1 shadow-sm border border-slate-50 truncate">{p.name} <Badge p={p}/></div>)}
+                                                            <div className="grid grid-cols-2 gap-2">
+                                                                {sec.players.map((p, i) => <div key={i} className="bg-slate-50 p-2 rounded-lg text-[10px] font-bold border">{p.name} <Badge p={p}/></div>)}
+                                                            </div>
                                                         </div>
                                                     ))}
                                                 </div>
+                                            )}
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                                                {day.shifts.map((shift, idx) => (
+                                                    <div key={idx} className="bg-slate-50 p-3 rounded-xl border">
+                                                        <div className="flex items-center gap-1.5 mb-2 opacity-50 text-[8px] font-black uppercase"><Icon name="clock" size={10} /> {shift.time}</div>
+                                                        {shift.players.map((p, i) => <div key={i} className="bg-white p-2 rounded-lg text-[9px] font-bold mb-1 shadow-sm">{p.name} <Badge p={p}/></div>)}
+                                                    </div>
+                                                ))}
                                             </div>
                                         </div>
-                                    ))
-                                )}
+                                    </div>
+                                ))}
                             </main>
                         </div>
                     </div>
 
                     {isModalOpen && (
-                        <div class="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-                            <div class="bg-white w-full max-w-5xl h-[85vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col animate-fade-in">
-                                <div class="bg-slate-900 p-6 text-white flex justify-between items-center">
-                                    <h2 class="text-sm font-black uppercase tracking-widest flex items-center gap-2"><Database size={16}/> Personnel Registry</h2>
-                                    <button onClick={() => { setIsModalOpen(false); setEditingMember(null); }} class="p-2 hover:bg-white/10 rounded-lg transition-colors"><X size={20}/></button>
+                        <div className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+                            <div className="bg-white w-full max-w-5xl h-[85vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col">
+                                <div className="bg-slate-900 p-6 text-white flex justify-between items-center">
+                                    <h2 className="text-sm font-black uppercase tracking-widest flex items-center gap-2"><Icon name="database" size={14} /> Registry</h2>
+                                    <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-white/10 rounded-lg"><Icon name="x" size={20} /></button>
                                 </div>
-                                <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
-                                    <div class="w-full md:w-80 p-6 bg-slate-50 border-r border-slate-100 overflow-y-auto custom-scrollbar">
-                                        <form onSubmit={handleMemberSubmit} class="space-y-4">
-                                            <div class="grid grid-cols-3 gap-2">
-                                                <input name="num" type="number" defaultValue={editingMember?.num} placeholder="#" class="p-3 rounded-xl border font-bold text-xs" required />
-                                                <input name="name" type="text" defaultValue={editingMember?.name} placeholder="Name" class="col-span-2 p-3 rounded-xl border font-bold text-xs" required />
+                                <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+                                    <div className="w-full md:w-80 p-6 bg-slate-50 border-r overflow-y-auto">
+                                        <form onSubmit={handleMemberSubmit} className="space-y-4">
+                                            <div className="grid grid-cols-3 gap-2">
+                                                <input name="num" type="number" defaultValue={editingMember?.num} placeholder="#" className="p-3 rounded-xl border font-bold text-xs" required />
+                                                <input name="name" type="text" defaultValue={editingMember?.name} placeholder="Name" className="col-span-2 p-3 rounded-xl border font-bold text-xs" required />
                                             </div>
-                                            <select name="gender" defaultValue={editingMember?.isMale ? 'male' : 'female'} class="w-full p-3 rounded-xl border font-bold text-xs bg-white">
+                                            <select name="gender" defaultValue={editingMember?.isMale ? 'male' : 'female'} className="w-full p-3 rounded-xl border font-bold text-xs">
                                                 <option value="female">Female</option>
                                                 <option value="male">Male</option>
                                             </select>
-                                            <div class="space-y-2 text-[10px] font-bold uppercase">
-                                                <label class="flex justify-between p-3 bg-white border rounded-xl hover:border-indigo-200 cursor-pointer"><div class="flex items-center gap-2 text-slate-500"><Languages size={12}/> English</div> <input type="checkbox" name="eng" class="accent-indigo-600" defaultChecked={editingMember?.isEnglish}/></label>
-                                                <label class="flex justify-between p-3 bg-white border rounded-xl hover:border-indigo-200 cursor-pointer"><div class="flex items-center gap-2 text-slate-500"><Car size={12}/> License</div> <input type="checkbox" name="drv" class="accent-indigo-600" defaultChecked={editingMember?.isDriver}/></label>
-                                                <label class="flex justify-between p-3 bg-white border rounded-xl hover:border-indigo-200 cursor-pointer"><div class="flex items-center gap-2 text-slate-500"><UserCheck size={12}/> Vehicle</div> <input type="checkbox" name="car" class="accent-indigo-600" defaultChecked={editingMember?.hasCar}/></label>
+                                            <div className="space-y-2 text-[10px] font-bold uppercase">
+                                                <label className="flex justify-between p-3 bg-white border rounded-xl"><div className="flex items-center gap-2"><Icon name="languages" size={12} /> English</div> <input type="checkbox" name="eng" defaultChecked={editingMember?.isEnglish}/></label>
+                                                <label className="flex justify-between p-3 bg-white border rounded-xl"><div className="flex items-center gap-2"><Icon name="car" size={12} /> License</div> <input type="checkbox" name="drv" defaultChecked={editingMember?.isDriver}/></label>
+                                                <label className="flex justify-between p-3 bg-white border rounded-xl"><div className="flex items-center gap-2"><Icon name="user-check" size={12} /> Vehicle</div> <input type="checkbox" name="car" defaultChecked={editingMember?.hasCar}/></label>
                                             </div>
-                                            <button class="w-full bg-indigo-600 text-white py-4 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-indigo-700 transition-all">{editingMember ? 'Update Profile' : 'Enroll Member'}</button>
-                                            {editingMember && <button type="button" onClick={() => setEditingMember(null)} class="w-full text-[9px] font-black uppercase text-slate-400">Cancel Edit</button>}
+                                            <button className="w-full bg-indigo-600 text-white py-3 rounded-xl font-black text-[10px] uppercase">{editingMember ? 'Update' : 'Enroll'}</button>
                                         </form>
                                     </div>
-                                    <div class="flex-1 p-6 overflow-y-auto custom-scrollbar bg-white">
-                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div className="flex-1 p-6 overflow-y-auto">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             {members.map(m => (
-                                                <div key={m.id} class="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between group hover:border-indigo-100 transition-all">
-                                                    <div class="flex items-center gap-3">
-                                                        <div class="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center text-[10px] font-black">{m.num}</div>
-                                                        <div><p class="text-[10px] font-black text-slate-700">{m.name}</p><Badge p={m} /></div>
+                                                <div key={m.id} className="p-3 rounded-xl bg-slate-50 border flex items-center justify-between group">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center text-[10px] font-black">{m.num}</div>
+                                                        <div><p className="text-[10px] font-black text-slate-700">{m.name}</p><Badge p={m} /></div>
                                                     </div>
-                                                    <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                                                        <button onClick={() => setEditingMember(m)} class="p-1.5 text-indigo-500 hover:bg-white rounded shadow-sm"><Edit2 size={12}/></button>
-                                                        <button onClick={() => FB.deleteDoc(FB.doc(db, 'artifacts', appId, 'public', 'data', 'members', m.id))} class="p-1.5 text-rose-500 hover:bg-white rounded shadow-sm"><Trash2 size={12}/></button>
+                                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button onClick={() => setEditingMember(m)} className="p-1.5 text-indigo-500 hover:bg-white rounded"><Icon name="edit-2" size={12} /></button>
+                                                        <button onClick={() => FB.deleteDoc(FB.doc(db, 'artifacts', appId, 'public', 'data', 'members', m.id))} className="p-1.5 text-rose-500 hover:bg-white rounded"><Icon name="trash-2" size={12} /></button>
                                                     </div>
                                                 </div>
                                             ))}
@@ -393,8 +404,10 @@
             );
         }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        window.addEventListener('firebase-ready', () => {
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+});
     </script>
 </body>
 </html>
