@@ -1,431 +1,400 @@
-import React, { useState, useEffect } from 'react';
-import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, doc, setDoc, collection, onSnapshot, addDoc, deleteDoc, updateDoc } from 'firebase/firestore';
-import { 
-  Shield, Calendar, Trash2, Edit2, X, Cloud, RefreshCcw, Check, 
-  Settings, UserPlus, Database, RotateCw, Lock, Clock, Languages, Car, UserCheck
-} from 'lucide-react';
-
-// --- CONFIGURATION ---
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-  apiKey: "AIzaSyCLKH_gbj1AG1m0q4ilHwX8QH8LkZKIfbc",
-  authDomain: "syscheduler.firebaseapp.com",
-  projectId: "syscheduler",
-  storageBucket: "syscheduler.firebasestorage.app",
-  messagingSenderId: "6630964118",
-  appId: "1:6630964118:web:97fdda60c8f240608b3bb7"
-};
-
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'syscheduler-v1';
-const LOGIN_PASSWORD = "SY2026PERFORMANCE";
-
-const SHIFT_ORDER = ["0-3", "3-6", "6-12", "12-18", "18-24"];
-const SHIFT_DEFS = { 
-  "0-3": "00:00-03:00", 
-  "3-6": "03:00-06:00", 
-  "6-12": "06:00-12:00", 
-  "12-18": "12:00-18:00", 
-  "18-24": "18:00-00:00" 
-};
-
-const INITIAL_ROSTER = [
-  { num: 1, name: "Qing Wang", isMale: false, isEnglish: true, isDriver: true, hasCar: true },
-  { num: 2, name: "Hao Wang (Diana)", isMale: false, isEnglish: true, isDriver: false, hasCar: false },
-  { num: 3, name: "Ling Young", isMale: false, isEnglish: true, isDriver: true, hasCar: false },
-  { num: 4, name: "Ma Lan (Sophia Li)", isMale: false, isEnglish: true, isDriver: true, hasCar: true },
-  { num: 5, name: "Tham Nguyen (Mina)", isMale: false, isEnglish: true, isDriver: true, hasCar: false },
-  { num: 6, name: "Qing Han", isMale: false, isEnglish: true, isDriver: true, hasCar: false },
-  { num: 7, name: "Le Thi Oanh (Aria)", isMale: false, isEnglish: true, isDriver: false, hasCar: false },
-  { num: 8, name: "Li Han", isMale: false, isEnglish: false, isDriver: false, hasCar: false },
-  { num: 9, name: "Ping Jiang", isMale: false, isEnglish: false, isDriver: true, hasCar: false },
-  { num: 10, name: "Hongjun Zheng (Lucinda)", isMale: false, isEnglish: false, isDriver: false, hasCar: false },
-  { num: 11, name: "Dongxia Sun", isMale: false, isEnglish: false, isDriver: true, hasCar: false },
-  { num: 12, name: "Xuemei Song (Sophie)", isMale: false, isEnglish: false, isDriver: false, hasCar: false },
-  { num: 13, name: "Deyun Xia", isMale: false, isEnglish: false, isDriver: false, hasCar: false },
-  { num: 14, name: "Lily Jia", isMale: false, isEnglish: true, isDriver: true, hasCar: true },
-  { num: 15, name: "Tuyet Nhung (Adela)", isMale: false, isEnglish: true, isDriver: true, hasCar: false },
-  { num: 16, name: "Thi Lien Huong (Lotus)", isMale: false, isEnglish: true, isDriver: true, hasCar: false },
-  { num: 17, name: "Ling Wu (Cassie)", isMale: false, isEnglish: true, isDriver: true, hasCar: false },
-  { num: 18, name: "Yongxian Li (Lynna)", isMale: false, isEnglish: true, isDriver: true, hasCar: true },
-  { num: 19, name: "Xiaodong Xu (William)", isMale: true, isEnglish: true, isDriver: true, hasCar: true },
-  { num: 20, name: "Larrison Manygoats", isMale: true, isEnglish: true, isDriver: true, hasCar: true },
-  { num: 21, name: "Zhiyuan Xie (Harry)", isMale: true, isEnglish: true, isDriver: true, hasCar: true },
-  { num: 22, name: "xiaoxiao", isMale: true, isEnglish: true, isDriver: false, hasCar: false },
-  { num: 23, name: "Cong Nguyen (Charles)", isMale: true, isEnglish: true, isDriver: false, hasCar: false },
-  { num: 24, name: "Jincheng Guo (Eric)", isMale: true, isEnglish: true, isDriver: false, hasCar: false },
-  { num: 25, name: "Shunxiang Wu", isMale: true, isEnglish: false, isDriver: false, hasCar: false }
-];
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-
-// --- HELPERS ---
-const Badge = ({ p }) => (
-  <div className="flex gap-1.5 mt-1.5 flex-wrap">
-    <div className={`w-2.5 h-2.5 rounded-full ${p.isMale ? 'bg-blue-400' : 'bg-pink-400'}`} title={p.isMale ? 'Male' : 'Female'}></div>
-    {p.isEnglish && <div className="w-2.5 h-2.5 rounded-full bg-indigo-500" title="English Speaker"></div>}
-    {p.isDriver && <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" title="Licensed Driver"></div>}
-    {p.hasCar && <div className="w-2.5 h-2.5 rounded-full bg-amber-400" title="Has Vehicle"></div>}
-  </div>
-);
-
-// --- MAIN COMPONENT ---
-export default function App() {
-  const [isAuth, setIsAuth] = useState(false);
-  const [passInput, setPassInput] = useState("");
-  const [user, setUser] = useState(null);
-  const [members, setMembers] = useState([]);
-  const [schedule, setSchedule] = useState({ days: [] });
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingMember, setEditingMember] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  const [dateRange, setDateRange] = useState({
-    start: new Date().toISOString().split('T')[0],
-    end: new Date(Date.now() + 172800000).toISOString().split('T')[0]
-  });
-
-  // Authentication Setup
-  useEffect(() => {
-    const saved = localStorage.getItem(`auth_${appId}`);
-    if (saved === LOGIN_PASSWORD) setIsAuth(true);
-
-    const initAuth = async () => {
-      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-        await signInWithCustomToken(auth, __initial_auth_token);
-      } else {
-        await signInAnonymously(auth);
-      }
-    };
-    initAuth();
-    return onAuthStateChanged(auth, setUser);
-  }, []);
-
-  // Real-time Sync
-  useEffect(() => {
-    if (!user || !isAuth) return;
-
-    const mRef = collection(db, 'artifacts', appId, 'public', 'data', 'members');
-    const sRef = doc(db, 'artifacts', appId, 'public', 'data', 'activeSchedule', 'current');
-
-    const unsubM = onSnapshot(mRef, (snap) => {
-      if (snap.empty) {
-        // Initial setup if DB is empty
-        INITIAL_ROSTER.forEach(m => addDoc(mRef, { ...m, inPool: true }));
-      } else {
-        const data = snap.docs.map(d => ({ ...d.data(), id: d.id }));
-        setMembers(data.sort((a, b) => a.num - b.num));
-      }
-    });
-
-    const unsubS = onSnapshot(sRef, (snap) => {
-      if (snap.exists()) setSchedule(snap.data());
-    });
-
-    return () => { unsubM(); unsubS(); };
-  }, [user, isAuth]);
-
-  // Scheduler Engine
-  const generateSchedule = async () => {
-    const pool = members.filter(m => m.inPool);
-    if (pool.length < 6) return alert("Select at least 6 members in the pool.");
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shift Master Enterprise</title>
     
-    setLoading(true);
-    const start = new Date(dateRange.start);
-    const end = new Date(dateRange.end);
-    const generatedDays = [];
-    
-    let dIter = new Date(start);
-    while (dIter <= end) {
-      const dateISO = dIter.toISOString().split('T')[0];
-      const shuffled = [...pool].sort(() => Math.random() - 0.5);
-      let pIdx = 0;
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide-react@latest"></script>
 
-      generatedDays.push({
-        id: crypto.randomUUID(),
-        date: dateISO,
-        label: dIter.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }),
-        shifts: SHIFT_ORDER.map(key => {
-          const players = [shuffled[pIdx % shuffled.length], shuffled[(pIdx + 1) % shuffled.length]];
-          pIdx += 2;
-          return { time: SHIFT_DEFS[key], players };
-        })
-      });
-      dIter.setDate(dIter.getDate() + 1);
-    }
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 10px; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+    </style>
+</head>
+<body class="bg-[#F1F5F9]">
+    <div id="root"></div>
 
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'activeSchedule', 'current'), {
-      days: generatedDays,
-      updatedAt: Date.now()
-    });
-    setLoading(false);
-  };
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, collection, onSnapshot, addDoc, deleteDoc, updateDoc, writeBatch, query } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-  const handleMemberSubmit = async (e) => {
-    e.preventDefault();
-    const formData = new FormData(e.target);
-    const data = {
-      num: Number(formData.get('num')),
-      name: formData.get('name'),
-      isMale: formData.get('gender') === 'male',
-      isEnglish: formData.get('eng') === 'on',
-      isDriver: formData.get('drv') === 'on',
-      hasCar: formData.get('car') === 'on',
-      inPool: true
-    };
+        window.FB = { 
+            initializeApp, getAuth, signInAnonymously, onAuthStateChanged,
+            getFirestore, doc, setDoc, collection, onSnapshot, addDoc, deleteDoc, updateDoc, writeBatch, query 
+        };
+    </script>
 
-    if (editingMember) {
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', editingMember.id), data);
-      setEditingMember(null);
-    } else {
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'members'), data);
-    }
-    e.target.reset();
-  };
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+        const { 
+            Shield, Calendar, Trash2, Edit2, X, RefreshCcw, 
+            UserPlus, Database, RotateCw, Lock, Clock, Languages, Car, UserCheck, Plus, AlertCircle 
+        } = lucideReact;
 
-  if (!isAuth) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
-        <div className="bg-white p-10 rounded-[3rem] shadow-2xl w-full max-w-md text-center">
-          <div className="w-16 h-16 bg-indigo-600 rounded-2xl mx-auto mb-6 flex items-center justify-center text-white shadow-xl shadow-indigo-100">
-            <Lock size={32} />
-          </div>
-          <h1 className="text-2xl font-black uppercase tracking-tight mb-2">Shift Master Pro</h1>
-          <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-8">Authorization Required</p>
-          <form onSubmit={(e) => {
-            e.preventDefault();
-            if (passInput === LOGIN_PASSWORD) {
-              setIsAuth(true);
-              localStorage.setItem(`auth_${appId}`, LOGIN_PASSWORD);
+        const firebaseConfig = {
+            apiKey: "AIzaSyCLKH_gbj1AG1m0q4ilHwX8QH8LkZKIfbc",
+            authDomain: "syscheduler.firebaseapp.com",
+            projectId: "syscheduler",
+            storageBucket: "syscheduler.firebasestorage.app",
+            messagingSenderId: "6630964118",
+            appId: "1:6630964118:web:97fdda60c8f240608b3bb7"
+        };
+
+        const appId = 'syscheduler-v4';
+        const LOGIN_PASSWORD = "SY2026PERFORMANCE";
+        const SHIFT_ORDER = ["0-3", "3-6", "6-12", "12-18", "18-24"];
+        const SHIFT_DEFS = { "0-3": "00:00-03:00", "3-6": "03:00-06:00", "6-12": "06:00-12:00", "12-18": "12:00-18:00", "18-24": "18:00-00:00" };
+
+        const INITIAL_ROSTER = [
+            { num: 1, name: "Qing Wang", isMale: false, isEnglish: true, isDriver: true, hasCar: true },
+            { num: 2, name: "Hao Wang (Diana)", isMale: false, isEnglish: true, isDriver: false, hasCar: false },
+            { num: 3, name: "Ling Young", isMale: false, isEnglish: true, isDriver: true, hasCar: false },
+            { num: 4, name: "Ma Lan (Sophia Li)", isMale: false, isEnglish: true, isDriver: true, hasCar: true },
+            { num: 5, name: "Tham Nguyen (Mina)", isMale: false, isEnglish: true, isDriver: true, hasCar: false },
+            { num: 6, name: "Qing Han", isMale: false, isEnglish: true, isDriver: true, hasCar: false },
+            { num: 7, name: "Le Thi Oanh (Aria)", isMale: false, isEnglish: true, isDriver: false, hasCar: false },
+            { num: 8, name: "Li Han", isMale: false, isEnglish: false, isDriver: false, hasCar: false },
+            { num: 9, name: "Ping Jiang", isMale: false, isEnglish: false, isDriver: true, hasCar: false },
+            { num: 10, name: "Hongjun Zheng (Lucinda)", isMale: false, isEnglish: false, isDriver: false, hasCar: false },
+            { num: 11, name: "Dongxia Sun", isMale: false, isEnglish: false, isDriver: true, hasCar: false },
+            { num: 12, name: "Xuemei Song (Sophie)", isMale: false, isEnglish: false, isDriver: false, hasCar: false },
+            { num: 13, name: "Deyun Xia", isMale: false, isEnglish: false, isDriver: false, hasCar: false },
+            { num: 14, name: "Lily Jia", isMale: false, isEnglish: true, isDriver: true, hasCar: true },
+            { num: 15, name: "Tuyet Nhung (Adela)", isMale: false, isEnglish: true, isDriver: true, hasCar: false },
+            { num: 16, name: "Thi Lien Huong (Lotus)", isMale: false, isEnglish: true, isDriver: true, hasCar: false },
+            { num: 17, name: "Ling Wu (Cassie)", isMale: false, isEnglish: true, isDriver: true, hasCar: false },
+            { num: 18, name: "Yongxian Li (Lynna)", isMale: false, isEnglish: true, isDriver: true, hasCar: true },
+            { num: 19, name: "Xiaodong Xu (William)", isMale: true, isEnglish: true, isDriver: true, hasCar: true },
+            { num: 20, name: "Larrison Manygoats", isMale: true, isEnglish: true, isDriver: true, hasCar: true },
+            { num: 21, name: "Zhiyuan Xie (Harry)", isMale: true, isEnglish: true, isDriver: true, hasCar: true },
+            { num: 22, name: "xiaoxiao", isMale: true, isEnglish: true, isDriver: false, hasCar: false },
+            { num: 23, name: "Cong Nguyen (Charles)", isMale: true, isEnglish: true, isDriver: false, hasCar: false },
+            { num: 24, name: "Jincheng Guo (Eric)", isMale: true, isEnglish: true, isDriver: false, hasCar: false },
+            { num: 25, name: "Shunxiang Wu", isMale: true, isEnglish: false, isDriver: false, hasCar: false }
+        ];
+
+        const app = FB.initializeApp(firebaseConfig);
+        const auth = FB.getAuth(app);
+        const db = FB.getFirestore(app);
+
+        const Badge = ({ p }) => (
+            <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                <div className={`w-2 h-2 rounded-full ${p.isMale ? 'bg-blue-400' : 'bg-pink-400'}`}></div>
+                {p.isEnglish && <div className="w-2 h-2 rounded-full bg-indigo-500"></div>}
+                {p.isDriver && <div className="w-2 h-2 rounded-full bg-emerald-500"></div>}
+                {p.hasCar && <div className="w-2 h-2 rounded-full bg-amber-400"></div>}
+            </div>
+        );
+
+        function App() {
+            const [isAuth, setIsAuth] = useState(false);
+            const [passInput, setPassInput] = useState("");
+            const [user, setUser] = useState(null);
+            const [members, setMembers] = useState([]);
+            const [secRules, setSecRules] = useState([]);
+            const [schedule, setSchedule] = useState({ days: [] });
+            const [isModalOpen, setIsModalOpen] = useState(false);
+            const [editingMember, setEditingMember] = useState(null);
+            const [loading, setLoading] = useState(false);
+            const [arrivalPeriod, setArrivalPeriod] = useState("12-18");
+            
+            const [dateRange, setDateRange] = useState({
+                start: new Date().toISOString().split('T')[0],
+                end: new Date(Date.now() + 86400000).toISOString().split('T')[0]
+            });
+
+            const [secForm, setSecForm] = useState({
+                date: new Date().toISOString().split('T')[0],
+                start: "08:00",
+                end: "17:00"
+            });
+
+            useEffect(() => {
+                const saved = localStorage.getItem(`auth_${appId}`);
+                if (saved === LOGIN_PASSWORD) setIsAuth(true);
+                FB.signInAnonymously(auth);
+                return FB.onAuthStateChanged(auth, setUser);
+            }, []);
+
+            useEffect(() => {
+                if (!user || !isAuth) return;
+                const mRef = FB.collection(db, 'artifacts', appId, 'public', 'data', 'members');
+                const rRef = FB.collection(db, 'artifacts', appId, 'public', 'data', 'secRules');
+                const sRef = FB.doc(db, 'artifacts', appId, 'public', 'data', 'activeSchedule', 'current');
+
+                const unsubM = FB.onSnapshot(mRef, (snap) => {
+                    if (snap.empty) {
+                        INITIAL_ROSTER.forEach(m => FB.addDoc(mRef, { ...m, inPool: true }));
+                    } else {
+                        setMembers(snap.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => a.num - b.num));
+                    }
+                });
+                const unsubR = FB.onSnapshot(rRef, (snap) => setSecRules(snap.docs.map(d => ({ ...d.data(), id: d.id }))));
+                const unsubS = FB.onSnapshot(sRef, (snap) => { if (snap.exists()) setSchedule(snap.data()); });
+
+                return () => { unsubM(); unsubR(); unsubS(); };
+            }, [user, isAuth]);
+
+            const generateSchedule = async () => {
+                const pool = members.filter(m => m.inPool);
+                if (pool.length < 8) { alert("Add 8+ people to the registry first."); return; }
+                setLoading(true);
+
+                const start = new Date(dateRange.start + "T00:00:00");
+                const end = new Date(dateRange.end + "T00:00:00");
+                const generatedDays = [];
+                let dIter = new Date(start);
+
+                while (dIter <= end) {
+                    const dateISO = dIter.toISOString().split('T')[0];
+                    const dailyBusy = new Set();
+                    const currentDay = {
+                        id: crypto.randomUUID(),
+                        date: dateISO,
+                        label: dIter.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }),
+                        security: [],
+                        shifts: []
+                    };
+
+                    const dayRules = secRules.filter(r => r.date === dateISO);
+                    dayRules.forEach(rule => {
+                        const pPool = pool.filter(p => !dailyBusy.has(p.num) && p.isEnglish);
+                        const p1 = pPool[Math.floor(Math.random() * pPool.length)] || pool[0];
+                        dailyBusy.add(p1.num);
+                        const p2 = pool.filter(p => !dailyBusy.has(p.num))[0];
+                        dailyBusy.add(p2.num);
+                        currentDay.security.push({ type: 'Primary', time: rule.time, players: [p1, p2] });
+                    });
+
+                    const isStartDay = dateISO === dateRange.start;
+                    const startIndex = isStartDay ? SHIFT_ORDER.indexOf(arrivalPeriod) : 0;
+                    
+                    SHIFT_ORDER.slice(startIndex).forEach(key => {
+                        const available = pool.filter(p => !dailyBusy.has(p.num));
+                        let players = available.length >= 2 ? [available[0], available[1]] : [{ name: 'VACANT', num:'?' }, { name: 'VACANT', num:'?' }];
+                        if (available.length >= 2) { dailyBusy.add(available[0].num); dailyBusy.add(available[1].num); }
+                        currentDay.shifts.push({ time: SHIFT_DEFS[key], players });
+                    });
+
+                    generatedDays.push(currentDay);
+                    dIter.setDate(dIter.getDate() + 1);
+                }
+
+                await FB.setDoc(FB.doc(db, 'artifacts', appId, 'public', 'data', 'activeSchedule', 'current'), {
+                    days: generatedDays,
+                    range: dateRange,
+                    updatedAt: Date.now()
+                });
+                setLoading(false);
+            };
+
+            const handleSecuritySubmit = async (e) => {
+                e.preventDefault();
+                await FB.addDoc(FB.collection(db, 'artifacts', appId, 'public', 'data', 'secRules'), {
+                    date: secForm.date,
+                    time: `${secForm.start} - ${secForm.end}`
+                });
+            };
+
+            const handleMemberSubmit = async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const data = {
+                    num: Number(formData.get('num')),
+                    name: formData.get('name'),
+                    isMale: formData.get('gender') === 'male',
+                    isEnglish: formData.get('eng') === 'on',
+                    isDriver: formData.get('drv') === 'on',
+                    hasCar: formData.get('car') === 'on',
+                    inPool: true
+                };
+                if (editingMember) {
+                    await FB.updateDoc(FB.doc(db, 'artifacts', appId, 'public', 'data', 'members', editingMember.id), data);
+                    setEditingMember(null);
+                } else {
+                    await FB.addDoc(FB.collection(db, 'artifacts', appId, 'public', 'data', 'members'), data);
+                }
+                e.target.reset();
+            };
+
+            if (!isAuth) {
+                return (
+                    <div class="min-h-screen bg-slate-950 flex items-center justify-center p-6">
+                        <div class="bg-white p-10 rounded-[2.5rem] shadow-2xl w-full max-w-md animate-fade-in">
+                            <Lock size={40} class="mx-auto text-indigo-600 mb-6" />
+                            <h1 class="text-center text-xl font-black uppercase tracking-widest mb-8">Access Portal</h1>
+                            <form onSubmit={(e) => { e.preventDefault(); if (passInput === LOGIN_PASSWORD) { setIsAuth(true); localStorage.setItem(`auth_${appId}`, LOGIN_PASSWORD); }}} class="space-y-4">
+                                <input type="password" value={passInput} onChange={(e) => setPassInput(e.target.value)} placeholder="Enter Pin" class="w-full bg-slate-100 p-4 rounded-2xl text-center font-bold outline-none ring-2 ring-transparent focus:ring-indigo-600" />
+                                <button class="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-black transition-colors">Unlock Console</button>
+                            </form>
+                        </div>
+                    </div>
+                );
             }
-          }} className="space-y-4">
-            <input 
-              type="password" 
-              value={passInput} 
-              onChange={(e) => setPassInput(e.target.value)}
-              placeholder="Portal Password"
-              className="w-full bg-slate-100 p-4 rounded-2xl border-2 border-transparent focus:border-indigo-600 outline-none text-center font-bold"
-            />
-            <button className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-black transition-colors">Login to Ops</button>
-          </form>
-        </div>
-      </div>
-    );
-  }
 
-  return (
-    <div className="min-h-screen bg-[#F8FAFC] p-4 lg:p-10 font-sans text-slate-900">
-      <div className="max-w-7xl mx-auto">
-        
-        {/* Header */}
-        <header className="flex flex-col md:flex-row justify-between items-center bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm mb-10">
-          <div className="flex items-center gap-5">
-            <div className="bg-indigo-600 p-4 rounded-3xl text-white shadow-lg shadow-indigo-100">
-              <Shield size={28} />
-            </div>
-            <div>
-              <h1 className="text-3xl font-black italic tracking-tighter uppercase leading-none">Shift Master <span className="text-indigo-600">Pro</span></h1>
-              <div className="flex items-center gap-2 mt-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Ops Dashboard</p>
-              </div>
-            </div>
-          </div>
-          <div className="flex gap-4 mt-6 md:mt-0">
-            <button 
-              onClick={generateSchedule}
-              disabled={loading}
-              className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-indigo-100 hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
-            >
-              {loading ? <RotateCw className="animate-spin" size={14} /> : <RefreshCcw size={14} />}
-              Compute Schedule
-            </button>
-            <button 
-              onClick={() => setIsModalOpen(true)}
-              className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-slate-200 hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
-            >
-              <Database size={14} />
-              Registry
-            </button>
-          </div>
-        </header>
+            return (
+                <div class="min-h-screen bg-[#F1F5F9] pb-20 text-slate-900">
+                    <div class="max-w-7xl mx-auto p-4 lg:p-8">
+                        <header class="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm mb-8 flex flex-col md:flex-row items-center justify-between gap-6 animate-fade-in">
+                            <div class="flex items-center gap-4">
+                                <div class="bg-slate-900 p-3 rounded-2xl text-white shadow-lg"><Shield size={20} /></div>
+                                <div>
+                                    <h1 class="text-xl font-black uppercase tracking-tighter">Shift Master <span class="text-indigo-600">Enterprise</span></h1>
+                                    <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">v4.0 Final • All-in-One</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-2 w-full md:w-auto">
+                                <button onClick={() => setIsModalOpen(true)} class="flex-1 bg-slate-100 px-5 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-slate-200 transition-all">
+                                    <Database size={14} /> Registry
+                                </button>
+                                <button onClick={generateSchedule} class="flex-1 bg-indigo-600 text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg flex items-center justify-center gap-2 hover:bg-indigo-700 transition-all">
+                                    {loading ? <RotateCw class="animate-spin" size={14} /> : <RefreshCcw size={14} />} Sync
+                                </button>
+                            </div>
+                        </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-          
-          {/* Sidebar / Controls */}
-          <aside className="lg:col-span-3 space-y-8">
-            <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm">
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-6 border-b pb-3">Selection Pool</h3>
-              <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-                {members.map(m => (
-                  <button 
-                    key={m.id} 
-                    onClick={() => updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', m.id), { inPool: !m.inPool })}
-                    className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all ${m.inPool ? 'bg-indigo-50 border-indigo-100' : 'bg-slate-50 border-transparent grayscale opacity-40'}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className={`text-[10px] font-black w-7 h-7 flex items-center justify-center rounded-lg ${m.inPool ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-400'}`}>{m.num}</span>
-                      <span className="text-[11px] font-bold text-slate-700 truncate">{m.name}</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
+                        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                            <aside class="lg:col-span-3 space-y-6">
+                                <div class="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm">
+                                    <h3 class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-6">Scheduler Range</h3>
+                                    <div class="space-y-4">
+                                        <div><label class="text-[8px] font-black text-slate-400 uppercase mb-1 block ml-1">Starts</label><input type="date" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})} class="w-full bg-slate-50 p-3 rounded-xl text-xs font-bold border" /></div>
+                                        <div><label class="text-[8px] font-black text-slate-400 uppercase mb-1 block ml-1">Ends</label><input type="date" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})} class="w-full bg-slate-50 p-3 rounded-xl text-xs font-bold border" /></div>
+                                        <div><label class="text-[8px] font-black text-slate-400 uppercase mb-1 block ml-1">Arrival Shift</label>
+                                            <select value={arrivalPeriod} onChange={e => setArrivalPeriod(e.target.value)} class="w-full bg-slate-50 p-3 rounded-xl text-xs font-bold border">
+                                                {SHIFT_ORDER.map(s => <option key={s} value={s}>{SHIFT_DEFS[s]}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm">
+                                    <h3 class="text-[10px] font-black uppercase tracking-widest text-indigo-600 mb-6 block">Add Security Job</h3>
+                                    <form onSubmit={handleSecuritySubmit} class="space-y-4">
+                                        <input type="date" value={secForm.date} onChange={e => setSecForm({...secForm, date: e.target.value})} class="w-full p-3 bg-slate-50 rounded-xl text-xs font-bold border" />
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <input type="time" value={secForm.start} onChange={e => setSecForm({...secForm, start: e.target.value})} class="bg-slate-50 p-3 rounded-xl text-[10px] font-bold border" />
+                                            <input type="time" value={secForm.end} onChange={e => setSecForm({...secForm, end: e.target.value})} class="bg-slate-50 p-3 rounded-xl text-[10px] font-bold border" />
+                                        </div>
+                                        <button class="w-full bg-slate-900 text-white py-3 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-black transition-colors">Add Job</button>
+                                    </form>
+                                    <div class="mt-6 space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
+                                        {secRules.map(r => (
+                                            <div key={r.id} class="bg-slate-50 p-2 rounded-lg flex justify-between items-center text-[9px] font-black border border-slate-100 animate-fade-in">
+                                                <span>{r.date} • {r.time}</span>
+                                                <button onClick={() => FB.deleteDoc(FB.doc(db, 'artifacts', appId, 'public', 'data', 'secRules', r.id))} class="text-rose-500 hover:scale-110 transition-transform"><Trash2 size={12} /></button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </aside>
 
-            <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm">
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Date Range</h3>
-              <div className="space-y-4">
-                <input 
-                  type="date" 
-                  value={dateRange.start} 
-                  onChange={e => setDateRange({...dateRange, start: e.target.value})} 
-                  className="w-full bg-slate-50 p-3 rounded-xl font-bold text-xs outline-none ring-1 ring-slate-100" 
-                />
-                <input 
-                  type="date" 
-                  value={dateRange.end} 
-                  onChange={e => setDateRange({...dateRange, end: e.target.value})} 
-                  className="w-full bg-slate-50 p-3 rounded-xl font-bold text-xs outline-none ring-1 ring-slate-100" 
-                />
-              </div>
-            </div>
-          </aside>
-
-          {/* Main Feed */}
-          <main className="lg:col-span-9 space-y-8">
-            {schedule.days.length > 0 ? schedule.days.map((day) => (
-              <div key={day.id} className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden">
-                <div className="bg-slate-900 px-8 py-5 flex justify-between items-center text-white">
-                  <div className="flex items-center gap-4">
-                    <Calendar size={18} className="text-indigo-400" />
-                    <h2 className="text-sm font-black uppercase tracking-widest">{day.label}</h2>
-                  </div>
-                  <button 
-                    onClick={async () => {
-                      const updated = schedule.days.filter(d => d.id !== day.id);
-                      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'activeSchedule', 'current'), { ...schedule, days: updated });
-                    }}
-                    className="p-2 text-white/20 hover:text-rose-500 transition-colors"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                </div>
-                <div className="p-8 grid grid-cols-1 md:grid-cols-5 gap-4">
-                  {day.shifts.map((shift, idx) => (
-                    <div key={idx} className="bg-slate-50 p-4 rounded-3xl border border-slate-100 group hover:bg-white hover:border-indigo-100 transition-all">
-                      <div className="flex items-center gap-2 mb-4">
-                        <Clock size={12} className="text-indigo-500" />
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{shift.time}</span>
-                      </div>
-                      <div className="space-y-4">
-                        {shift.players.map((p, pidx) => (
-                          <div key={pidx}>
-                            <p className="text-[11px] font-black uppercase text-slate-800 tracking-tight leading-none truncate">{p.name}</p>
-                            <Badge p={p} />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )) : (
-              <div className="bg-white rounded-[3rem] border-2 border-dashed border-slate-200 p-20 text-center">
-                <Calendar className="mx-auto text-slate-200 mb-6" size={64} />
-                <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">No active schedule found</p>
-              </div>
-            )}
-          </main>
-        </div>
-      </div>
-
-      {/* Database Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xl flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-6xl h-[85vh] rounded-[3.5rem] shadow-2xl flex flex-col overflow-hidden">
-            <div className="p-8 bg-slate-900 text-white flex justify-between items-center">
-              <div className="flex items-center gap-4">
-                <Database className="text-indigo-400" />
-                <h2 className="text-xl font-black uppercase tracking-tight">Personnel Registry</h2>
-              </div>
-              <button onClick={() => { setIsModalOpen(false); setEditingMember(null); }} className="p-2 hover:bg-white/10 rounded-xl">
-                <X size={24} />
-              </button>
-            </div>
-
-            <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-              <div className="w-full md:w-[400px] p-8 bg-slate-50 border-r border-slate-100 overflow-y-auto">
-                <form onSubmit={handleMemberSubmit} className="space-y-6">
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="col-span-1">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">ID</label>
-                      <input name="num" type="number" defaultValue={editingMember?.num} required className="w-full p-4 rounded-2xl outline-none font-bold" />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Name</label>
-                      <input name="name" type="text" defaultValue={editingMember?.name} required className="w-full p-4 rounded-2xl outline-none font-bold" />
-                    </div>
-                  </div>
-
-                  <select name="gender" defaultValue={editingMember?.isMale ? 'male' : 'female'} className="w-full p-4 rounded-2xl outline-none font-bold">
-                    <option value="female">Female</option>
-                    <option value="male">Male</option>
-                  </select>
-
-                  <div className="grid grid-cols-1 gap-3">
-                    {[
-                      { id: 'eng', label: 'English Speaker', icon: <Languages size={14} /> },
-                      { id: 'drv', label: 'Licensed Driver', icon: <Car size={14} /> },
-                      { id: 'car', label: 'Has Vehicle', icon: <UserCheck size={14} /> }
-                    ].map(item => (
-                      <label key={item.id} className="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-100 cursor-pointer hover:border-indigo-200 transition-all">
-                        <div className="flex items-center gap-3">
-                          <span className="text-indigo-500">{item.icon}</span>
-                          <span className="text-[10px] font-black uppercase tracking-widest">{item.label}</span>
+                            <main class="lg:col-span-9 space-y-8">
+                                {schedule.days.length === 0 ? (
+                                    <div class="bg-white rounded-[2.5rem] border-2 border-dashed border-slate-200 p-20 text-center animate-fade-in">
+                                        <Calendar size={40} class="mx-auto text-slate-200 mb-4" />
+                                        <p class="text-slate-400 font-bold text-sm uppercase tracking-widest">No Active Schedule</p>
+                                    </div>
+                                ) : (
+                                    schedule.days.map((day) => (
+                                        <div key={day.id} class="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden animate-fade-in">
+                                            <div class="bg-slate-900 px-8 py-5 flex justify-between items-center text-white">
+                                                <h2 class="text-[11px] font-black uppercase tracking-widest">{day.label}</h2>
+                                                <div class="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]"></div>
+                                            </div>
+                                            <div class="p-8 space-y-8">
+                                                {day.security?.length > 0 && (
+                                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-6 rounded-[1.5rem] border border-slate-100">
+                                                        {day.security.map((sec, idx) => (
+                                                            <div key={idx} class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                                                                <div class="flex justify-between items-center mb-3">
+                                                                    <span class="text-[9px] font-black text-indigo-600 uppercase tracking-tighter">{sec.time}</span>
+                                                                    <span class="text-[7px] font-black px-1.5 py-0.5 rounded bg-slate-900 text-white uppercase tracking-widest">{sec.type}</span>
+                                                                </div>
+                                                                <div class="grid grid-cols-2 gap-2">
+                                                                    {sec.players.map((p, i) => <div key={i} class="bg-slate-50 p-2 rounded-lg text-[10px] font-bold border border-slate-100 truncate">{p.name} <Badge p={p}/></div>)}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                                                    {day.shifts.map((shift, idx) => (
+                                                        <div key={idx} class="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                                            <div class="flex items-center gap-1.5 mb-2 opacity-50 text-[8px] font-black uppercase tracking-widest"><Clock size={10} /> {shift.time}</div>
+                                                            {shift.players.map((p, i) => <div key={i} class="bg-white p-2 rounded-lg text-[9px] font-bold mb-1 shadow-sm border border-slate-50 truncate">{p.name} <Badge p={p}/></div>)}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </main>
                         </div>
-                        <input type="checkbox" name={item.id} defaultChecked={editingMember?.[item.id === 'eng' ? 'isEnglish' : item.id === 'drv' ? 'isDriver' : 'hasCar']} className="w-5 h-5 accent-indigo-600 rounded" />
-                      </label>
-                    ))}
-                  </div>
-
-                  <button className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-black transition-all">
-                    {editingMember ? 'Update Profile' : 'Enlist Personnel'}
-                  </button>
-                </form>
-              </div>
-
-              <div className="flex-1 p-8 overflow-y-auto custom-scrollbar bg-white">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {members.map(m => (
-                    <div key={m.id} className="p-5 rounded-[2rem] bg-slate-50 border border-slate-100 flex justify-between items-center group hover:bg-white hover:border-indigo-100 transition-all">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black text-xs">
-                          {m.num}
-                        </div>
-                        <div>
-                          <p className="text-[11px] font-black text-slate-800 uppercase">{m.name}</p>
-                          <Badge p={m} />
-                        </div>
-                      </div>
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => setEditingMember(m)} className="p-3 text-indigo-600 hover:bg-indigo-50 rounded-xl"><Edit2 size={16} /></button>
-                        <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', m.id))} className="p-3 text-rose-600 hover:bg-rose-50 rounded-xl"><Trash2 size={16} /></button>
-                      </div>
                     </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
-      <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 10px; }
-      `}</style>
-    </div>
-  );
-}
+                    {isModalOpen && (
+                        <div class="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+                            <div class="bg-white w-full max-w-5xl h-[85vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col animate-fade-in">
+                                <div class="bg-slate-900 p-6 text-white flex justify-between items-center">
+                                    <h2 class="text-sm font-black uppercase tracking-widest flex items-center gap-2"><Database size={16}/> Personnel Registry</h2>
+                                    <button onClick={() => { setIsModalOpen(false); setEditingMember(null); }} class="p-2 hover:bg-white/10 rounded-lg transition-colors"><X size={20}/></button>
+                                </div>
+                                <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
+                                    <div class="w-full md:w-80 p-6 bg-slate-50 border-r border-slate-100 overflow-y-auto custom-scrollbar">
+                                        <form onSubmit={handleMemberSubmit} class="space-y-4">
+                                            <div class="grid grid-cols-3 gap-2">
+                                                <input name="num" type="number" defaultValue={editingMember?.num} placeholder="#" class="p-3 rounded-xl border font-bold text-xs" required />
+                                                <input name="name" type="text" defaultValue={editingMember?.name} placeholder="Name" class="col-span-2 p-3 rounded-xl border font-bold text-xs" required />
+                                            </div>
+                                            <select name="gender" defaultValue={editingMember?.isMale ? 'male' : 'female'} class="w-full p-3 rounded-xl border font-bold text-xs bg-white">
+                                                <option value="female">Female</option>
+                                                <option value="male">Male</option>
+                                            </select>
+                                            <div class="space-y-2 text-[10px] font-bold uppercase">
+                                                <label class="flex justify-between p-3 bg-white border rounded-xl hover:border-indigo-200 cursor-pointer"><div class="flex items-center gap-2 text-slate-500"><Languages size={12}/> English</div> <input type="checkbox" name="eng" class="accent-indigo-600" defaultChecked={editingMember?.isEnglish}/></label>
+                                                <label class="flex justify-between p-3 bg-white border rounded-xl hover:border-indigo-200 cursor-pointer"><div class="flex items-center gap-2 text-slate-500"><Car size={12}/> License</div> <input type="checkbox" name="drv" class="accent-indigo-600" defaultChecked={editingMember?.isDriver}/></label>
+                                                <label class="flex justify-between p-3 bg-white border rounded-xl hover:border-indigo-200 cursor-pointer"><div class="flex items-center gap-2 text-slate-500"><UserCheck size={12}/> Vehicle</div> <input type="checkbox" name="car" class="accent-indigo-600" defaultChecked={editingMember?.hasCar}/></label>
+                                            </div>
+                                            <button class="w-full bg-indigo-600 text-white py-4 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-indigo-700 transition-all">{editingMember ? 'Update Profile' : 'Enroll Member'}</button>
+                                            {editingMember && <button type="button" onClick={() => setEditingMember(null)} class="w-full text-[9px] font-black uppercase text-slate-400">Cancel Edit</button>}
+                                        </form>
+                                    </div>
+                                    <div class="flex-1 p-6 overflow-y-auto custom-scrollbar bg-white">
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            {members.map(m => (
+                                                <div key={m.id} class="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between group hover:border-indigo-100 transition-all">
+                                                    <div class="flex items-center gap-3">
+                                                        <div class="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center text-[10px] font-black">{m.num}</div>
+                                                        <div><p class="text-[10px] font-black text-slate-700">{m.name}</p><Badge p={m} /></div>
+                                                    </div>
+                                                    <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                                        <button onClick={() => setEditingMember(m)} class="p-1.5 text-indigo-500 hover:bg-white rounded shadow-sm"><Edit2 size={12}/></button>
+                                                        <button onClick={() => FB.deleteDoc(FB.doc(db, 'artifacts', appId, 'public', 'data', 'members', m.id))} class="p-1.5 text-rose-500 hover:bg-white rounded shadow-sm"><Trash2 size={12}/></button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
